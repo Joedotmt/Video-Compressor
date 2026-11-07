@@ -95,13 +95,19 @@ export function dragCrop(original, handle, dx, dy, bounds, ratio = 0) {
 
 // View-only geometry: zooming and panning never alter export coordinates.
 export function timelineGeometry(duration, viewport, zoom) {
-  const clipWidth = viewport * .8 * zoom;
-  const padding = viewport / 2;
-  return { clipWidth, padding, width: clipWidth + 2 * padding, pixelsPerSecond: clipWidth / duration };
+  const width = viewport * zoom, clipWidth = width * .9;
+  return { clipWidth, padding: 0, width, pixelsPerSecond: clipWidth / duration };
 }
 export function zoomScrollPosition(zoom, viewport, duration, time, anchor = viewport / 2) {
   const g = timelineGeometry(duration, viewport, zoom);
   return clamp(g.padding + time * g.pixelsPerSecond - anchor, 0, g.width - viewport);
+}
+export function moveSegment(ranges, index, delta, duration) {
+  const segment = ranges[index];
+  const min = (ranges[index - 1]?.end ?? 0) - segment.start;
+  const max = (ranges[index + 1]?.start ?? duration) - segment.end;
+  const shift = clamp(delta, min, max);
+  return { start: segment.start + shift, end: segment.end + shift };
 }
 export function previewGeometry(source, viewportWidth, viewportHeight, scale = null, center = null) {
   const fit = Math.min(Math.max(1, viewportWidth - 40) / source.width, Math.max(1, viewportHeight - 40) / source.height);

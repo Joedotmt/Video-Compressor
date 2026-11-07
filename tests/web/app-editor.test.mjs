@@ -38,7 +38,10 @@ test('tabs, edit validation, automatic dimensions and export share the same job'
   }
   $('mark-in').click(); assert.equal($('compress').disabled, false);
   assert.equal($('cancel-draft'), null);
-  $('settings').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+  assert.equal($('compress').textContent, 'Export');
+  assert.ok($('compress').closest('.app-header')); assert.ok($('replace').closest('.app-header'));
+  assert.ok($('edit-tab').closest('.app-header'));
+  $('compress').click();
   assert.equal($('edit-controls').disabled, true);
   assert.equal(submitted.duration, 2.5);
   assert.deepEqual(submitted.segments, [{ start: 1, end: 3 }, { start: 5, end: 8 }]);

@@ -14,7 +14,7 @@ const key = (value, target = document.body) => target.dispatchEvent(new dom.wind
 const reset = () => { editor.reset(new Blob(['test']), source); editor.setBusy(false); $('edit-panel').hidden = false; };
 test('I/O repeatedly creates multiple ranges and exact fields update boundaries', () => {
   reset(); editor.position(1); key('i', $('seek')); assert.deepEqual(editor.getEdits().segments, [{ start: 1, end: 10 }]);
-  assert.equal(document.querySelector('.timeline-segment').style.width, '460.8px');
+  assert.equal(document.querySelector('.timeline-segment').style.width, '518.4px');
   editor.position(3); key('o'); editor.position(5); key('i'); editor.position(8); key('o');
   assert.deepEqual(editor.getEdits().segments, [{ start: 1, end: 3 }, { start: 5, end: 8 }]);
   document.querySelector('[aria-label="Select segment 1"]').click();
@@ -59,11 +59,11 @@ test('an In point is immediately exportable, repeated I adjusts it and O closes 
 test('timeline zoom keeps the playhead centered, supports fit and does not change edits', () => {
   reset(); Object.defineProperty($('timeline-scroll'), 'clientWidth', { value: 640, configurable: true });
   editor.position(5); key('i'); const before = editor.getEdits();
-  key('='); assert.equal(editor.timelineZoom, 2); assert.equal($('timeline-scroll').scrollLeft, 512);
-  assert.equal($('timeline-content').style.width, '1664px');
-  key('+'); assert.equal(editor.timelineZoom, 4); assert.equal($('timeline-scroll').scrollLeft, 1024);
+  key('='); assert.equal(editor.timelineZoom, 2); assert.equal($('timeline-scroll').scrollLeft, 256);
+  assert.equal($('timeline-content').style.width, '1280px');
+  key('+'); assert.equal(editor.timelineZoom, 4); assert.equal($('timeline-scroll').scrollLeft, 832);
   key('-'); assert.equal(editor.timelineZoom, 2);
-  key('\\'); assert.equal(editor.timelineZoom, 1); assert.equal($('timeline-scroll').scrollLeft, 256);
+  key('\\'); assert.equal(editor.timelineZoom, 1); assert.equal($('timeline-scroll').scrollLeft, 0);
   assert.deepEqual(editor.getEdits(), before);
   key('=', $('crop-width')); assert.equal(editor.timelineZoom, 1);
   editor.position(6); key('o'); editor.position(8); key('i'); assert.equal(editor.segments.length, 2);
@@ -150,7 +150,7 @@ test('clicking the track or selecting a segment does not seek; inspector edits a
   assert.equal($('segment-fields').hidden, true); assert.equal($('delete-segment').disabled, true);
   assert.equal(typeof $('timeline').onpointerdown, 'undefined');
 });
-test('dragging the playhead scrubs padded timelines and clamps outside the source', () => {
+test('dragging the playhead scrubs zoomed timelines and clamps outside the source', () => {
   reset(); const handle = $('playhead-handle'); handle.setPointerCapture = () => {};
   $('timeline-content').getBoundingClientRect = () => ({ left: -200 });
   const begin = time => editor.scrub({ button: 0, target: handle, currentTarget: handle, pointerId: 1, clientX: editor.timeX(time) - 200, preventDefault() {} });
@@ -222,4 +222,64 @@ test('opposite boundaries separate marks so new segments still form on either si
   assert.deepEqual(editor.segments.at(-1), { start: 40 / source.fps, end: source.duration });
   mark(22, 'o'); assert.equal(editor.points.length, 4);
   assert.deepEqual(editor.segments[1], { start: 10 / source.fps, end: 22 / source.fps });
+});
+
+test('whole-segment dragging preserves duration and stops at neighbors without seeking', () => {
+  reset();
+  for (const [time, type] of [[1, 'i'], [2, 'o'], [4, 'i'], [6, 'o'], [8, 'i'], [9, 'o']]) { editor.position(time); key(type); }
+  editor.position(5);
+  const viewport = $('timeline-scroll'); viewport.setPointerCapture = () => {};
+  viewport.getBoundingClientRect = () => ({ left: -10000, right: 10000 });
+  const pps = editor.timelineMetrics().pixelsPerSecond;
+  editor.dragSegment({ button: 0, clientX: 300, pointerId: 1, preventDefault() {}, stopPropagation() {} }, 1);
+  const move = delta => { const e = new dom.window.Event('pointermove'); Object.assign(e, { clientX: 300 + delta * pps }); viewport.dispatchEvent(e); };
+  move(1); assert.deepEqual(editor.segments[1], { start: 5, end: 7 });
+  move(20); assert.deepEqual(editor.segments[1], { start: 6, end: 8 });
+  move(-20); assert.deepEqual(editor.segments[1], { start: 2, end: 4 });
+  assert.deepEqual(editor.segments[0], { start: 1, end: 2 }); assert.deepEqual(editor.segments[2], { start: 8, end: 9 });
+  assert.equal(editor.playhead, 5); assert.equal($('segment-duration').textContent, '00:00:02.000');
+  viewport.dispatchEvent(new dom.window.Event('pointerup'));
+  assert.equal(editor.trimDragging, false);
+});
+test('whole-segment dragging respects source boundaries and inferred In/Out points', () => {
+  reset(); editor.position(2); key('o');
+  const viewport = $('timeline-scroll'); viewport.setPointerCapture = () => {};
+  viewport.getBoundingClientRect = () => ({ left: -10000, right: 10000 });
+  const pps = editor.timelineMetrics().pixelsPerSecond;
+  editor.dragSegment({ button: 0, clientX: 300, pointerId: 1, preventDefault() {}, stopPropagation() {} }, 0);
+  const move = delta => { const e = new dom.window.Event('pointermove'); Object.assign(e, { clientX: 300 + delta * pps }); viewport.dispatchEvent(e); };
+  move(20); assert.deepEqual(editor.segments, [{ start: 8, end: 10 }]);
+  move(-20); assert.deepEqual(editor.segments, [{ start: 0, end: 2 }]);
+  viewport.dispatchEvent(new dom.window.Event('pointerup'));
+});
+test('middle-drag pans without seeking or altering edits and cannot expose negative time', () => {
+  reset(); editor.position(2); key('i'); editor.position(4); key('o');
+  const before = editor.getEdits(), viewport = $('timeline-scroll'); viewport.setPointerCapture = () => {};
+  editor.zoomTimeline(4, 0, 0); editor.scrollTimeline(200);
+  const event = (type, x, button = 1) => { const e = new dom.window.Event(type, { bubbles: true, cancelable: true }); Object.assign(e, { clientX: x, button, pointerId: 1 }); return e; };
+  document.querySelector('.timeline-segment button').dispatchEvent(event('pointerdown', 300));
+  viewport.dispatchEvent(event('pointermove', 200)); assert.equal(viewport.scrollLeft, 300);
+  viewport.dispatchEvent(event('pointermove', 1000)); assert.equal(viewport.scrollLeft, 0);
+  viewport.dispatchEvent(event('pointerup', 1000)); assert.equal(viewport.classList.contains('panning'), false);
+  assert.equal(editor.playhead, 4); assert.deepEqual(editor.getEdits(), before);
+  assert.equal(editor.timeX(0), 0);
+});
+test('navigator ends zoom around the opposite edge, body pans, and fit restores the source view', () => {
+  reset(); editor.position(2); key('i'); const before = editor.getEdits();
+  const nav = editor.navigation, bar = $('timeline-navigator'); bar.setPointerCapture = () => {};
+  Object.defineProperty(bar, 'clientWidth', { value: 640, configurable: true });
+  const begin = (id, x) => nav.dragNavigator({ target: $(id), button: 0, clientX: x, pointerId: 1, preventDefault() {} });
+  const move = x => { const e = new dom.window.Event('pointermove'); Object.assign(e, { clientX: x }); bar.dispatchEvent(e); };
+  const end = () => bar.dispatchEvent(new dom.window.Event('pointerup'));
+  begin('timeline-window-end', 640); move(320); end();
+  assert.equal(editor.timelineZoom, 2); assert.equal($('timeline-scroll').scrollLeft, 0);
+  const initial = nav.metrics();
+  begin('timeline-window-start', 0); move(160); end();
+  assert.equal(editor.timelineZoom, 4); assert.ok(Math.abs(nav.metrics().end - initial.end) < 1e-8);
+  const left = $('timeline-scroll').scrollLeft;
+  begin('timeline-window-pan', 200); move(240); end();
+  assert.ok($('timeline-scroll').scrollLeft > left);
+  key('Home', $('timeline-window-pan')); assert.equal($('timeline-scroll').scrollLeft, 0);
+  bar.dispatchEvent(new dom.window.Event('dblclick')); assert.equal(editor.timelineZoom, 1);
+  assert.deepEqual(editor.getEdits(), before); assert.equal($('timeline-zoom'), null);
 });

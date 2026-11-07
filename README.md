@@ -59,7 +59,8 @@ The original Python/GTK implementation remains available. See [desktop setup](do
 ## Trim & Crop
 
 Open a video and select the **Trim & Crop** tab. Compression settings and edits
-share the same export; the original file is never modified.
+share the same export; the original file is never modified. The tabs, video chooser,
+and **Export** button share the application header.
 
 - Seek by clicking or dragging the timeline ruler, dragging its playhead, or
   entering an exact playhead time. Clicking the track or a segment never seeks.
@@ -86,20 +87,23 @@ share the same export; the original file is never modified.
   **X, Y, Width, Height** in original-video pixels (arithmetic is supported).
   Exact dimension edits switch to Free. Arrow keys move the focused crop or its
   handles by one pixel; Shift moves ten.
-- Zoom the timeline around the playhead with **= / +** and **−**, or its zoom
-  slider. **\** fits the whole video. Scroll horizontally to pan; **Alt + wheel**
-  zooms around the pointer. Scrollable space before and after the source gives
-  room to navigate. Drag the blue playhead to scrub and the In/Out handles on
-  the clip to adjust the points.
+- Drag a segment's body to move both boundaries together. Its duration stays
+  fixed, and it stops at neighboring segments or the start/end of the source.
+- The scrollbar below the timeline doubles as a zoom control: drag its middle
+  to pan and either end to resize the visible time range. Double-click it or
+  press **\** to fit. **= / +**, **−**, and **Alt + wheel** also zoom.
+  Middle-drag or scroll horizontally to pan. A fixed shaded gutter sits to the
+  left of zero; panning cannot expose negative time.
 - The preview has independent zoom and pan: wheel to zoom around the pointer,
   **Space-drag**, middle-drag, or **Hand (H)** to pan, and **Z** to fit the whole
   video. **Crop (V)** returns to editing the rectangle. Enter a magnification
   between 1% and 6400%, or use the +/− buttons. Changing the crop never moves
   the view, and changing the view never affects exported pixels.
 - On mobile, pinch to zoom and pan the preview, use Hand for one-finger panning,
-  and use the visible timeline zoom controls. Swipe the track to scroll; drag
-  the playhead or use the seek slider to scrub. The crop inspector moves below
-  the timeline on narrow screens.
+  and drag the timeline scrollbar ends to zoom. Drag the playhead or use the
+  seek slider to scrub. The inspector collapses below the timeline on narrow
+  screens. Desktop editing fills the window, with scrolling confined to the
+  inspector or status area when necessary.
 - Output dimensions follow the crop until you manually edit the resize settings.
   Video Reset uses the current crop dimensions. The target-size budget uses the
   total kept duration, adjusted for playback speed.

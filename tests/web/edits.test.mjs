@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeEdits, segmentsFromPoints, dragCrop, fitRatio, parseTime, timecode, zoomScrollPosition, previewGeometry, timelineGeometry, zoomPreviewAt } from '../../web/edits.js';
+import { normalizeEdits, segmentsFromPoints, dragCrop, fitRatio, parseTime, timecode, zoomScrollPosition, previewGeometry, timelineGeometry, moveSegment, zoomPreviewAt } from '../../web/edits.js';
 import { plan, command, metadata } from '../../web/compressor.js';
 const source = { duration: 20, width: 1920, height: 1080, audio: true };
 test('kept ranges are sorted and overlaps merged; removed ranges are inverted', () => {
@@ -51,19 +51,30 @@ test('rotated source metadata uses the orientation seen by browser and FFmpeg', 
 });
 
 test('timeline zoom anchors the requested time and clamps at either edge', () => {
-  assert.equal(zoomScrollPosition(2, 640, 10, 2.5, 160), 416);
-  assert.equal(zoomScrollPosition(4, 640, 10, 5), 1024);
+  assert.equal(zoomScrollPosition(2, 640, 10, 2.5, 160), 128);
+  assert.equal(zoomScrollPosition(4, 640, 10, 5), 832);
   assert.equal(zoomScrollPosition(4, 640, 10, 0), 0);
-  assert.equal(zoomScrollPosition(4, 640, 10, 10), 2048);
-  assert.equal(zoomScrollPosition(1, 640, 10, 5), 256);
+  assert.equal(zoomScrollPosition(4, 640, 10, 10), 1920);
+  assert.equal(zoomScrollPosition(1, 640, 10, 5), 0);
 });
-test('timeline has scrollable space before and after the source even when zoomed out', () => {
-  for (const zoom of [.25, 1, 64, 4096]) {
+test('timeline begins at zero, fits at minimum zoom and retains a small trailing area', () => {
+  for (const zoom of [1, 64, 4096]) {
     const g = timelineGeometry(10, 640, zoom);
-    assert.equal(g.padding, 320);
-    assert.equal(g.width - g.padding - g.clipWidth, 320);
-    assert.equal(g.clipWidth / g.pixelsPerSecond, 10);
+    assert.equal(g.padding, 0);
+    assert.equal(g.width, 640 * zoom);
+    assert.ok(Math.abs(g.clipWidth / g.pixelsPerSecond - 10) < 1e-8);
+    assert.ok(g.width > g.clipWidth);
   }
+});
+test('moving a whole segment clamps against adjacent segments and source bounds', () => {
+  const ranges = [{ start: 1, end: 2 }, { start: 4, end: 6 }, { start: 8, end: 9 }];
+  for (const delta of [-100, -2, -1, 0, 1, 2, 100]) {
+    const result = moveSegment(ranges, 1, delta, 10);
+    assert.equal(result.end - result.start, 2);
+    assert.ok(result.start >= 2 && result.end <= 8);
+  }
+  assert.deepEqual(moveSegment(ranges, 0, -100, 10), { start: 0, end: 1 });
+  assert.deepEqual(moveSegment(ranges, 2, 100, 10), { start: 9, end: 10 });
 });
 test('preview fit respects portrait and landscape bounds; zoom anchors the source pixel under the cursor', () => {
   for (const source of [{ width: 1920, height: 1080 }, { width: 1080, height: 1920 }]) {

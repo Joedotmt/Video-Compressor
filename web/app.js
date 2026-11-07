@@ -31,7 +31,7 @@ function validate() {
       if (!$('output-name').value.trim() || /[/\\\x00-\x1f]/.test($('output-name').value)) { job = null; throw new Error('Enter a filename without slashes or control characters.'); }
       const hasEdits = editor.segments.length > 0 || editor.hasCrop();
       $('edit-summary').hidden = !hasEdits;
-      $('edit-summary').textContent = hasEdits ? `Edits: ${durationLabel(job.duration)} output · crop ${job.crop.width} × ${job.crop.height} at ${job.crop.x}, ${job.crop.y}. Applied when compressing.` : '';
+      $('edit-summary').textContent = hasEdits ? `Edits: ${durationLabel(job.duration)} output · crop ${job.crop.width} × ${job.crop.height} at ${job.crop.x}, ${job.crop.y}. Applied on export.` : '';
       $('bitrate').textContent = `${number(job.videoBps / 1000)} kbps`;
       $('output-summary').textContent = `${job.width} × ${job.height} · ${number(job.fps)} fps · ${durationLabel(job.duration)} output`;
     } catch (error) { $('validation').textContent = error.message; if (error.field) $(error.field).setAttribute('aria-invalid', 'true'); $('bitrate').textContent = '—'; }
@@ -46,7 +46,7 @@ function setBusy(value) {
   $('activity').hidden = !value; $('cancel').disabled = false;
   $('cancel').hidden = !value;
   $('compress').hidden = !source;
-  $('editor').hidden = !source;
+  $('editor').hidden = !source; $('source-info').hidden = !source;
   $('empty-state').hidden = !!source || value;
   validate();
 }
@@ -58,7 +58,7 @@ function newRunner(duration) {
     if (!duration || !busy) return;
     const percent = Math.min(99, Math.max(0, seconds / duration * 100));
     $('progress').value = percent;
-    $('activity-title').textContent = `Compressing · ${Math.floor(percent)}%`;
+    $('activity-title').textContent = `Exporting · ${Math.floor(percent)}%`;
     $('status').textContent = `${durationLabel((Date.now() - started) / 1000)} elapsed · Keep this tab open.`;
   });
 }
@@ -75,7 +75,7 @@ async function openFile(selected) {
     const info = await task.probe(selected);
     if (task.cancelled) return;
     source = info; file = selected; automaticDimensions = true; editor.reset(file, source);
-    $('filename').textContent = file.name;
+    $('filename').textContent = file.name; $('filename').title = file.name;
     $('source-summary').textContent = `${source.width} × ${source.height} · ${number(source.fps)} fps · ${durationLabel(source.duration)} · ${number(source.sizeMB)} MB`;
     $('target').value = Math.max(.01, source.sizeMB).toFixed(2);
     resetVideo(); resetAudio(); $('speed').value = '1';
@@ -145,7 +145,7 @@ $('settings').addEventListener('submit', async event => {
   const currentJob = { ...job };
   const outputName = $('output-name').value.trim().replace(/(?:\.mp4)?$/i, '.mp4');
   clearOutput(); message(); setBusy(true); started = Date.now();
-  activity('Preparing compression…', 'Loading the encoder. Processing stays on this device.');
+  activity('Preparing export…', 'Loading the encoder. Processing stays on this device.');
   const task = newRunner(currentJob.duration); runner = task;
   try {
     const blob = await task.compress(file, currentJob);
@@ -162,4 +162,4 @@ window.addEventListener('beforeunload', event => { if (busy) { event.preventDefa
 encoderOptions(); validate();
 
 $('dropzone').disabled = true;
-initializeIsolation().finally(() => { initializing = false; $('dropzone').disabled = false; });
+initializeIsolation().finally(() => { initializing = false; $('dropzone').disabled = false; $('replace').disabled = false; });

@@ -8,12 +8,20 @@
   <link rel="stylesheet" href="/web/style.css">
 </head>
 <body>
-  <header class="app-header"><h1>Joemt Video Compressor</h1></header>
-  <main>
+  <header class="app-header">
+    <h1>Joemt Video Compressor</h1>
     <nav class="tabs" role="tablist" aria-label="Video tools">
       <button id="compression-tab" role="tab" aria-selected="true" aria-controls="compression-panel" type="button">Compression</button>
       <button id="edit-tab" role="tab" aria-selected="false" aria-controls="edit-panel" tabindex="-1" type="button" disabled>Trim &amp; Crop</button>
     </nav>
+    <div id="source-info" class="source-info" hidden><strong id="filename"></strong><p id="source-summary" class="description"></p></div>
+    <div class="header-actions">
+      <button id="replace" type="button" title="Choose another video (Ctrl+O)" disabled>Choose Video…</button>
+      <button id="cancel" type="button" hidden>Cancel</button>
+      <button id="compress" type="submit" form="settings" disabled hidden>Export</button>
+    </div>
+  </header>
+  <main>
     <input id="file" type="file" accept="video/*,.mkv,.avi,.mov,.m4v,.mts,.m2ts,.ts,.webm" hidden>
     <section id="empty-state">
       <p>Open a video or drop one here.</p>
@@ -21,19 +29,6 @@
     </section>
 
     <div id="editor" hidden>
-      <section id="source-group" aria-labelledby="input-heading">
-        <div class="section-heading"><h2 id="input-heading">Input Video</h2></div>
-        <div class="preference-list">
-        <div class="row">
-          <div class="source-info">
-            <strong id="filename"></strong>
-            <p id="source-summary" class="description"></p>
-          </div>
-          <button id="replace" type="button">Choose Another Video…</button>
-        </div>
-        </div>
-      </section>
-
       <div id="compression-panel" role="tabpanel" aria-labelledby="compression-tab">
       <form id="settings" novalidate>
         <fieldset id="controls" disabled>
@@ -141,7 +136,8 @@
             <span id="video-duration" class="description"></span>
           </div>
           </section>
-          <section class="crop-inspector" aria-labelledby="crop-heading">
+          <details id="inspector" class="crop-inspector" open>
+            <summary>Inspector</summary>
             <div class="section-heading"><h2 id="crop-heading">Crop</h2><button id="reset-crop" type="button">Reset</button></div>
             <div class="preference-list">
               <div class="row"><label for="crop-ratio">Aspect Ratio</label><select id="crop-ratio"><option value="0">Free</option><option value="original">Original</option><option value="1">1:1</option><option value="1.7777777777777777">16:9</option><option value="0.5625">9:16</option><option value="1.3333333333333333">4:3</option><option value="0.75">3:4</option></select></div>
@@ -168,16 +164,10 @@
               <div class="row"><label for="trim-mode">Marked Segments</label><select id="trim-mode"><option value="keep">Keep</option><option value="remove">Remove</option></select></div>
                 <label class="preview-selection"><input id="preview-kept" type="checkbox"> Preview kept segments only</label>
             </section>
-          </section>
+          </details>
           <section class="timeline-panel" aria-label="Timeline editor">
-          <div class="zoom-toolbar timeline-toolbar">
-            <strong>Timeline</strong>
-            <button id="timeline-zoom-out" type="button" aria-label="Zoom timeline out" title="Zoom Out (−)">−</button>
-            <input id="timeline-zoom" type="range" min="-2" max="12" step="0.25" value="0" aria-label="Timeline zoom">
-            <button id="timeline-zoom-in" type="button" aria-label="Zoom timeline in" title="Zoom In (=)">+</button>
-            <button id="timeline-fit" type="button" title="Fit timeline (backslash)">Fit</button>
-            <output id="timeline-zoom-label">1×</output>
-          </div>
+          <div class="timeline-lane">
+          <div class="timeline-gutter" aria-hidden="true"><span>Video</span></div>
           <div id="timeline-scroll" tabindex="0" role="group" aria-label="Timeline. Equals and minus to zoom; backslash to fit. Scroll to pan.">
             <div id="timeline-content">
               <div id="timeline-ruler" aria-label="Time ruler"></div>
@@ -190,9 +180,16 @@
               <input id="seek" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek video">
             </div>
           </div>
+          </div>
+          <div class="timeline-navigator" id="timeline-navigator" aria-label="Timeline navigation" title="Drag to pan; drag either end to zoom. Double-click to fit.">
+            <div id="timeline-thumb">
+              <button id="timeline-window-start" class="navigator-edge start" type="button" role="slider" aria-label="Visible timeline start" aria-orientation="horizontal"></button>
+              <button id="timeline-window-pan" type="button" role="scrollbar" aria-label="Pan timeline" aria-controls="timeline-content" aria-orientation="horizontal"></button>
+              <button id="timeline-window-end" class="navigator-edge end" type="button" role="slider" aria-label="Visible timeline end" aria-orientation="horizontal"></button>
+            </div>
+          </div>
 
-
-          <section aria-labelledby="trim-heading">
+          <section class="timeline-footer" aria-labelledby="trim-heading">
             <h2 id="trim-heading" class="visually-hidden">Trim</h2>
             <div class="trim-toolbar">
               <button id="mark-in" type="button">Set In (I)</button>
@@ -200,7 +197,7 @@
               <button id="split-segment" type="button" title="Split at playhead (B)">Split</button><button id="reset-trim" type="button">Reset</button>
             </div>
             <p id="trim-summary" class="description" aria-live="polite">No cuts. The full video will be kept.</p>
-            <details class="shortcut-help"><summary>Keyboard Shortcuts</summary><p class="description">I: Add In point · O: Add Out point · =/−: Timeline zoom · \: Fit timeline · B: Split · Delete: Remove selected segment · Z: Fit video · H/V: Hand/Crop tool · Space: Play/Pause (hold and drag to pan) · ←/→: Seek 1 second · ,/.: Step by nominal frame duration. Shortcuts are active in this tab outside text fields. Times accept seconds or HH:MM:SS.mmm.</p></details>
+            <details class="shortcut-help"><summary>Keyboard Shortcuts</summary><p class="description">Drag a segment to move it · Middle-drag: Pan timeline · Drag scrollbar ends: Zoom · I: Add In point · O: Add Out point · =/−: Timeline zoom · \: Fit timeline · B: Split · Delete: Remove selected segment · Z: Fit video · H/V: Hand/Crop tool · Space: Play/Pause (hold and drag to pan) · ←/→: Seek 1 second · ,/.: Step by nominal frame duration. Shortcuts are active in this tab outside text fields. Times accept seconds or HH:MM:SS.mmm.</p></details>
           </section>
 
           </section>
@@ -218,12 +215,8 @@
         <progress id="progress" max="100" value="0"></progress>
         <p id="status" class="description" role="status" aria-live="polite"></p>
       </div>
-      <div class="actions">
-        <button id="cancel" type="button" hidden>Cancel</button>
-        <button id="compress" type="submit" form="settings" disabled hidden>Compress</button>
-      </div>
       <div id="result" hidden>
-        <p>Compression complete.</p>
+        <p>Export complete.</p>
         <p id="result-summary" class="description"></p>
         <a id="download" download>Download Video</a>
       </div>
