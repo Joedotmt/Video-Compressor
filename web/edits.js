@@ -1,5 +1,14 @@
 // Source-space edit geometry and time ranges, shared by the UI and encoder.
 export const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+// The final boundary may include a partial frame; preserve the exact source end.
+export const frameCount = source => Math.ceil(source.duration * source.fps - 1e-7);
+export const frameIndex = (time, source) => time >= source.duration ? frameCount(source) : clamp(Math.round(time * source.fps), 0, frameCount(source));
+export const frameTime = (index, source) => Math.min(clamp(index, 0, frameCount(source)) / source.fps, source.duration);
+export function snapTime(time, source, bounds = [0, source.duration]) {
+  const first = Math.ceil(bounds[0] * source.fps - 1e-7);
+  const last = bounds[1] >= source.duration ? frameCount(source) : Math.floor(bounds[1] * source.fps + 1e-7);
+  return frameTime(clamp(frameIndex(time, source), first, last), source);
+}
 export function timecode(seconds) {
   const ms = Math.round(Math.max(0, seconds) * 1000);
   return `${String(Math.floor(ms / 3600000)).padStart(2, '0')}:${String(Math.floor(ms / 60000) % 60).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}`;

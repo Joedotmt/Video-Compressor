@@ -66,6 +66,11 @@ below the compression settings on that tab), without keeping a status bar open.
 
 - Seek by clicking or dragging on the timeline background or ruler, clicking a segment, dragging the playhead, or
   entering an exact playhead time. Dragging segments or trim handles leaves the playhead in place.
+- Playback follows rendered video frames, with an animation-frame fallback. Seeking,
+  In/Out points, typed timecodes, and segment moves snap to the source frame grid,
+  including fractional rates such as 29.97 fps. The exact source end remains available.
+  This grid uses the reported frame rate; variable-frame-rate files are approximated
+  rather than indexed by individual frame timestamps.
 - **I** places an In point and **O** places an Out point, independently of the
   selected segment. Points are paired in time order: a leading Out starts at
   source time zero, and a trailing In runs to the source end. For example, Out

@@ -1,7 +1,7 @@
 import { TimelineNavigation } from './timeline.js';
 import { PreviewView } from './preview.js';
 import { expression } from './compressor.js';
-import { clamp, timecode, parseTime, segmentsFromPoints, normalizeEdits, fitRatio, dragCrop, moveSegment, zoomScrollPosition, timelineGeometry } from './edits.js';
+import { clamp, timecode, parseTime, frameCount, frameIndex, frameTime, snapTime, segmentsFromPoints, normalizeEdits, fitRatio, dragCrop, moveSegment, zoomScrollPosition, timelineGeometry } from './edits.js';
 const $ = id => document.getElementById(id);
 const cropFields = ['x', 'y', 'width', 'height'];
 export class VideoEditor {
@@ -19,7 +19,7 @@ export class VideoEditor {
     this.dispose(); this.source = source; this.points = []; this.ranges = []; this.nextPointId = 1; this.selected = null; this.activePoint = null; this.playhead = 0;
     this.crop = { x: 0, y: 0, width: source.width, height: source.height };
     $('crop-ratio').value = '0'; $('trim-mode').value = 'keep'; $('preview-kept').checked = false;
-    $('seek').max = source.duration; this.timelineZoom = 1; this.previewZoom = 1;
+    $('seek').max = source.duration; $('seek').step = 1 / source.fps; this.timelineZoom = 1; this.previewZoom = 1;
     this.preview.reset(); this.timelineNeedsFit = true;
     $('timeline-scroll').scrollLeft = 0;
     $('timeline-content').style.width = '100%';
@@ -32,17 +32,19 @@ export class VideoEditor {
     this.error('');
   }
   dispose() {
+    this.stopPlaybackClock();
     this.video.pause(); this.updatePlayback(false); this.video.removeAttribute('src'); this.video.load();
     if (this.url) URL.revokeObjectURL(this.url);
     this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishCropDrag?.(); this.finishScrub?.();
     this.url = null; this.source = null; this.preview?.reset(); this.spaceHeld = false; $('preview-viewport').classList.remove('space-pan');
   }
   setPreview(blob) {
+    this.stopPlaybackClock();
     if (this.url) URL.revokeObjectURL(this.url);
     this.url = URL.createObjectURL(blob); $('preview-unavailable').hidden = true;
     this.video.src = this.url; this.video.load();
   }
-  setBusy(busy) { if (busy) { this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishScrub?.(); } this.busy = busy; $('edit-controls').disabled = busy || !this.source; if (busy) this.video.pause(); }
+  setBusy(busy) { if (busy) { this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishScrub?.(); this.stopPlaybackClock(); } this.busy = busy; $('edit-controls').disabled = busy || !this.source; if (busy) this.video.pause(); }
   error(text = '') { $('edit-error').textContent = text; }
   getEdits() {
     if (this.points.length && !this.ranges.length) throw new Error('These points do not define a segment. Move or delete a point.');
@@ -53,14 +55,14 @@ export class VideoEditor {
   notify() { this.onChange(); }
   position(time) {
     if (!this.source) return;
-    this.playhead = clamp(time, 0, this.source.duration);
-    if (this.video.readyState) this.video.currentTime = this.playhead;
+    this.playhead = snapTime(time, this.source);
+    if (this.video.readyState && Math.abs(this.video.currentTime - this.playhead) > 1e-7) this.video.currentTime = this.playhead;
     this.updateTime();
   }
   updateTime() {
     $('seek').value = this.playhead;
     if (document.activeElement !== $('playhead-time')) $('playhead-time').value = timecode(this.playhead);
-    $('timeline-playhead').style.left = `${this.source ? this.timeX(this.playhead) : 0}px`;
+    $('timeline-playhead').style.transform = `translateX(${this.source ? this.timeX(this.playhead) : 0}px)`;
     $('playhead-handle').setAttribute('aria-valuenow', this.playhead);
     $('playhead-handle').setAttribute('aria-valuetext', timecode(this.playhead));
   }
@@ -68,6 +70,44 @@ export class VideoEditor {
     const button = $('play'), label = playing ? 'Pause' : 'Play';
     button.dataset.playing = String(playing);
     button.setAttribute('aria-label', label); button.title = `${label} (Space)`;
+  }
+  stopPlaybackClock() { this.cancelPlaybackClock?.(); this.cancelPlaybackClock = null; }
+  startPlaybackClock() {
+    this.stopPlaybackClock();
+    const video = this.video, view = document.defaultView;
+    const useVideoFrames = typeof video.requestVideoFrameCallback === 'function';
+    if (!useVideoFrames && !view?.requestAnimationFrame) return;
+    let id, stopped = false;
+    const schedule = () => { id = useVideoFrames ? video.requestVideoFrameCallback(tick) : view.requestAnimationFrame(tick); };
+    const tick = (_, metadata) => {
+      if (stopped || !this.source || video.paused || video.ended) return;
+      if (!video.seeking) this.syncPlayback(metadata?.mediaTime ?? video.currentTime);
+      if (!stopped && !video.paused && !video.ended) schedule();
+    };
+    this.cancelPlaybackClock = () => {
+      stopped = true;
+      if (useVideoFrames) video.cancelVideoFrameCallback(id);
+      else view.cancelAnimationFrame(id);
+    };
+    schedule();
+  }
+  syncPlayback(time) {
+    if (!this.source) return;
+    const snapped = snapTime(time, this.source);
+    if (snapped !== this.playhead) { this.playhead = snapped; this.updateTime(); }
+    if (!this.video.paused && $('preview-kept').checked) {
+      try {
+        const kept = normalizeEdits(this.getEdits(), this.source).segments;
+        if (!kept.some(s => this.playhead >= s.start && this.playhead < s.end)) {
+          const next = kept.find(s => s.start > this.playhead);
+          if (next) this.position(next.start); else this.video.pause();
+        }
+      } catch { this.video.pause(); }
+    }
+  }
+  stepFrame(delta) {
+    this.video.pause();
+    this.position(frameTime(frameIndex(this.playhead, this.source) + delta, this.source));
   }
   async play() {
     if (this.video.paused) {
@@ -92,6 +132,7 @@ export class VideoEditor {
   }
   addPoint(type, time = this.playhead) {
     this.finishTrimDrag?.();
+    time = snapTime(time, this.source);
     if ((type === 'in' && time >= this.source.duration) || (type === 'out' && time <= 0)) {
       this.error(type === 'in' ? 'Place In before the end of the video.' : 'Place Out after the start of the video.'); return;
     }
@@ -129,6 +170,7 @@ export class VideoEditor {
     }
   }
   split() {
+    this.playhead = snapTime(this.playhead, this.source);
     const range = this.ranges.find(s => s.start < this.playhead && s.end > this.playhead);
     if ((!range && this.points.length) || this.playhead <= 0 || this.playhead >= this.source.duration) {
       this.error('Move the playhead inside a segment to split it.'); return;
@@ -188,7 +230,7 @@ export class VideoEditor {
         if (!['ArrowLeft', 'ArrowRight'].includes(event.key) || this.busy) return;
         event.preventDefault(); event.stopPropagation();
         const id = this.ensurePoint(point);
-        this.movePoint(id, point.time + (event.shiftKey ? 1 : 1 / this.source.fps) * (event.key === 'ArrowLeft' ? -1 : 1), this.pointBounds(point, index));
+        this.movePoint(id, frameTime(frameIndex(point.time, this.source) + (event.shiftKey ? Math.round(this.source.fps) : 1) * (event.key === 'ArrowLeft' ? -1 : 1), this.source), this.pointBounds(point, index));
         this.renderSegments(); this.notify();
         $('timeline-points').querySelector(`[data-point-id="${id}"]`)?.focus();
       };
@@ -208,17 +250,20 @@ export class VideoEditor {
   pointBounds(point, index) {
     const range = this.ranges[index];
     if (!range) return [0, this.source.duration];
-    const gap = Math.min(1 / this.source.fps, (range.end - range.start) / 2);
-    return point.type === 'in' ? [this.ranges[index - 1]?.end ?? 0, range.end - gap] : [range.start + gap, this.ranges[index + 1]?.start ?? this.source.duration];
+    return point.type === 'in'
+      ? [this.ranges[index - 1]?.end ?? 0, frameTime(frameIndex(range.end, this.source) - 1, this.source)]
+      : [frameTime(frameIndex(range.start, this.source) + 1, this.source), this.ranges[index + 1]?.start ?? this.source.duration];
   }
   movePoint(id, time, bounds = [0, this.source.duration]) {
-    this.points.find(p => p.id === id).time = clamp(time, ...bounds);
+    this.points.find(p => p.id === id).time = snapTime(time, this.source, bounds);
     this.rebuildSegments(id); this.error('');
   }
   editBoundary(key, value) {
     const segment = this.ranges[this.selected];
     if (!segment) return;
-    const time = parseTime(value);
+    const parsed = parseTime(value);
+    if (parsed > this.source.duration) throw new Error('Point must be within the video.');
+    const time = snapTime(parsed, this.source);
     normalizeEdits({ segments: [{ ...segment, [key]: time }] }, this.source);
     const limits = this.pointBounds({ type: key === 'start' ? 'in' : 'out' }, this.selected);
     if (time < limits[0] || time > limits[1]) throw new Error('Segments cannot overlap.');
@@ -229,6 +274,7 @@ export class VideoEditor {
     if (this.busy || event.button !== 0) return;
     event.preventDefault(); event.stopPropagation();
     const viewport = $('timeline-scroll'), original = this.ranges.map(s => ({ ...s }));
+    const frames = original.map(s => ({ start: frameIndex(s.start, this.source), end: frameIndex(s.end, this.source) }));
     const segment = original[index], startX = event.clientX, startScroll = viewport.scrollLeft;
     const pixelsPerSecond = this.timelineMetrics().pixelsPerSecond;
     let startId = segment.startId, endId = segment.endId, moved = false;
@@ -241,11 +287,11 @@ export class VideoEditor {
       const pixels = e.clientX - startX + viewport.scrollLeft - startScroll;
       if (!moved && Math.abs(pixels) < 3) return;
       moved = true;
-      const next = moveSegment(original, index, pixels / pixelsPerSecond, this.source.duration);
+      const next = moveSegment(frames, index, Math.round(pixels / pixelsPerSecond * this.source.fps), frameCount(this.source));
       startId = this.ensurePoint({ id: startId, type: 'in', time: segment.start });
       endId = this.ensurePoint({ id: endId, type: 'out', time: segment.end });
-      this.points.find(p => p.id === startId).time = next.start;
-      this.points.find(p => p.id === endId).time = next.end;
+      this.points.find(p => p.id === startId).time = frameTime(next.start, this.source);
+      this.points.find(p => p.id === endId).time = frameTime(next.end, this.source);
       this.rebuildSegments(startId); this.error(''); this.renderSegments(); this.notify();
     };
     const end = event => {
@@ -420,7 +466,7 @@ export class VideoEditor {
     $('playhead-handle').onkeydown = event => {
       if (this.busy || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault(); event.stopPropagation();
-      this.position(event.key === 'Home' ? 0 : event.key === 'End' ? this.source.duration : this.playhead + (event.key === 'ArrowLeft' ? -1 : 1) / this.source.fps);
+      this.position(event.key === 'Home' ? 0 : event.key === 'End' ? this.source.duration : frameTime(frameIndex(this.playhead, this.source) + (event.key === 'ArrowLeft' ? -1 : 1), this.source));
     };
     if (globalThis.ResizeObserver) {
       this.resizeObserver = new ResizeObserver(() => this.refreshView());
@@ -432,26 +478,22 @@ export class VideoEditor {
     $('make-preview').onclick = onPreview;
     this.video.addEventListener('error', () => { if (this.url) $('preview-unavailable').hidden = false; });
     this.video.addEventListener('loadedmetadata', () => this.position(this.playhead));
-    this.video.addEventListener('play', () => this.updatePlayback(true));
-    this.video.addEventListener('pause', () => this.updatePlayback(false));
-    this.video.addEventListener('ended', () => this.updatePlayback(false));
+    this.video.addEventListener('play', () => { this.updatePlayback(true); this.startPlaybackClock(); });
+    const stopPlayback = () => {
+      this.stopPlaybackClock(); this.updatePlayback(false);
+      if (this.video.readyState) this.syncPlayback(this.video.currentTime);
+    };
+    this.video.addEventListener('pause', stopPlayback);
+    this.video.addEventListener('ended', stopPlayback);
     this.video.addEventListener('timeupdate', () => {
-      this.playhead = this.video.currentTime; this.updateTime();
-      if (!this.video.paused && $('preview-kept').checked) {
-        try {
-          const kept = normalizeEdits(this.getEdits(), this.source).segments;
-          if (!kept.some(s => this.playhead >= s.start && this.playhead < s.end)) {
-            const next = kept.find(s => s.start > this.playhead);
-            if (next) this.position(next.start); else this.video.pause();
-          }
-        } catch { this.video.pause(); }
-      }
+      // Do not let coarse timeupdate events overwrite the displayed frame clock.
+      if (!this.cancelPlaybackClock || this.video.paused) this.syncPlayback(this.video.currentTime);
     });
     $('play').onclick = () => this.play();
-    $('step-back').onclick = () => { this.video.pause(); this.position(this.playhead - 1 / this.source.fps); };
-    $('step-forward').onclick = () => { this.video.pause(); this.position(this.playhead + 1 / this.source.fps); };
+    $('step-back').onclick = () => this.stepFrame(-1);
+    $('step-forward').onclick = () => this.stepFrame(1);
     $('seek').oninput = () => this.position(Number($('seek').value));
-    $('playhead-time').onchange = () => { try { this.position(parseTime($('playhead-time').value)); this.error(''); } catch (e) { this.error(e.message); } };
+    $('playhead-time').onchange = () => { try { this.position(parseTime($('playhead-time').value)); $('playhead-time').value = timecode(this.playhead); this.error(''); } catch (e) { this.error(e.message); } };
     $('mark-in').onclick = () => this.markIn(); $('mark-out').onclick = () => this.markOut();
     $('split-segment').onclick = () => this.split();
     $('delete-segment').onclick = () => this.deleteSelection();

@@ -19,7 +19,7 @@ test('I/O repeatedly creates multiple ranges and exact fields update boundaries'
   assert.deepEqual(editor.getEdits().segments, [{ start: 1, end: 3 }, { start: 5, end: 8 }]);
   document.querySelector('[aria-label="Select segment 1"]').click();
   const input = $('segment-in'); input.value = '1.250'; input.dispatchEvent(new dom.window.Event('change'));
-  assert.equal(editor.segments[0].start, 1.25);
+  assert.equal(editor.segments[0].start, 1.24);
   $('trim-mode').value = 'remove'; $('trim-mode').dispatchEvent(new dom.window.Event('change'));
   assert.equal(editor.getEdits().mode, 'remove'); assert.ok(notifications > 0);
 });
@@ -146,7 +146,7 @@ test('track clicks seek and clear selection; inspector edits and deletes selecti
   $('segment-out').value = '1'; $('segment-out').dispatchEvent(new dom.window.Event('change'));
   assert.throws(() => editor.getEdits(), /highlighted/);
   $('segment-out').value = '3.5'; $('segment-out').dispatchEvent(new dom.window.Event('change'));
-  assert.equal(editor.getEdits().segments[0].end, 3.5); assert.equal(editor.playhead, 5);
+  assert.equal(editor.getEdits().segments[0].end, 3.52); assert.equal(editor.playhead, 5);
   $('delete-segment').click(); assert.deepEqual(editor.segments, [{ start: 6, end: 8 }]);
   $('timeline-content').getBoundingClientRect = () => ({ left: 0 });
   $('source-clip').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, clientX: editor.timeX(3) }));
@@ -409,3 +409,90 @@ test('transport icons track playback state and frame-step buttons retain their b
   assert.equal(document.querySelector('.time-jump').textContent.trim(), '');
   assert.equal($('playhead-time').getAttribute('aria-label'), 'Playhead time');
 });
+
+test('seeks, marks, typed boundaries, splits and drags use source frame boundaries', () => {
+  reset(); editor.zoomTimeline(4096);
+  editor.position(1.019); assert.equal(editor.playhead, 1);
+  editor.position(1.021); assert.equal(editor.playhead, 1.04);
+  editor.addPoint('in', 1.013); editor.addPoint('out', 2.027);
+  assert.deepEqual(editor.segments, [{ start: 1, end: 2.04 }]);
+  editor.selectSegment(0); editor.editBoundary('start', '1.111');
+  assert.equal(editor.segments[0].start, 1.12);
+  const point = editor.points.find(p => p.type === 'out');
+  editor.movePoint(point.id, 2.019); assert.equal(point.time, 2);
+  editor.movePoint(point.id, 1.12, editor.pointBounds(point, 0));
+  assert.equal(point.time, 1.16); // Never collapse the segment below one frame.
+  editor.movePoint(point.id, 3); editor.position(2.013); editor.split();
+  assert.deepEqual(editor.segments, [{ start: 1.12, end: 2 }, { start: 2, end: 3 }]);
+  const viewport = $('timeline-scroll'); viewport.setPointerCapture = () => {};
+  viewport.getBoundingClientRect = () => ({ left: -10000, right: 10000 });
+  editor.dragSegment({ button: 0, clientX: 300, pointerId: 1, preventDefault() {}, stopPropagation() {} }, 1);
+  const move = new dom.window.Event('pointermove');
+  Object.assign(move, { clientX: 300 + .053 * editor.timelineMetrics().pixelsPerSecond }); viewport.dispatchEvent(move);
+  viewport.dispatchEvent(new dom.window.Event('pointerup'));
+  assert.deepEqual(editor.segments[1], { start: 2.04, end: 3.04 });
+});
+
+test('fractional frame rates step without drift and preserve the terminal source boundary', () => {
+  const fractional = { ...source, fps: 30000 / 1001, duration: 10.02 };
+  editor.reset(new Blob(['test']), fractional); editor.setBusy(false);
+  editor.position(0);
+  for (let i = 0; i < 300; i++) editor.stepFrame(1);
+  assert.equal(editor.playhead, 300 / fractional.fps);
+  editor.stepFrame(1); assert.equal(editor.playhead, fractional.duration);
+  editor.stepFrame(-1); assert.equal(editor.playhead, 300 / fractional.fps);
+  for (let i = 0; i < 300; i++) editor.stepFrame(-1);
+  assert.equal(editor.playhead, 0);
+  reset();
+});
+
+for (const videoFrames of [true, false]) {
+  test(`${videoFrames ? 'video frame' : 'animation frame'} callbacks update playback and cancel cleanly`, () => {
+    reset();
+    const video = editor.video, view = document.defaultView, callbacks = new Map();
+    let nextId = 0, paused = false, currentTime = 0, seeks = 0;
+    const request = cb => { callbacks.set(++nextId, cb); return nextId; };
+    const cancel = id => callbacks.delete(id);
+    const fire = time => {
+      const [id, cb] = callbacks.entries().next().value;
+      callbacks.delete(id); cb(0, videoFrames ? { mediaTime: time } : undefined);
+    };
+    Object.defineProperties(video, {
+      paused: { configurable: true, get: () => paused },
+      readyState: { configurable: true, value: 4 },
+      currentTime: { configurable: true, get: () => currentTime, set: value => { currentTime = value; seeks++; } }
+    });
+    video.pause = () => { paused = true; video.dispatchEvent(new dom.window.Event('pause')); };
+    if (videoFrames) { video.requestVideoFrameCallback = request; video.cancelVideoFrameCallback = cancel; }
+    else { view.requestAnimationFrame = request; view.cancelAnimationFrame = cancel; }
+    try {
+      video.dispatchEvent(new dom.window.Event('play'));
+      assert.equal(callbacks.size, 1);
+      for (let frame = 1; frame <= 5; frame++) {
+        currentTime = videoFrames ? .77 : frame / source.fps;
+        fire(frame / source.fps);
+        assert.equal(editor.playhead, frame / source.fps);
+        assert.equal(callbacks.size, 1);
+      }
+      assert.equal(seeks, 0); // Drawing the playhead must never seek the video.
+      currentTime = .9; video.dispatchEvent(new dom.window.Event('timeupdate'));
+      assert.equal(editor.playhead, .2); // Coarse events cannot override the frame clock.
+      editor.position(1); editor.markIn(); editor.position(2); editor.markOut();
+      editor.position(4); editor.markIn(); editor.position(5); editor.markOut();
+      $('preview-kept').checked = true;
+      currentTime = 2; fire(2); assert.equal(currentTime, 4);
+      const stale = callbacks.values().next().value;
+      video.pause(); assert.equal(callbacks.size, 0);
+      stale(0, { mediaTime: 7 }); assert.equal(callbacks.size, 0);
+      assert.equal(editor.playhead, 4);
+      paused = false; video.dispatchEvent(new dom.window.Event('play'));
+      assert.equal(callbacks.size, 1);
+      editor.dispose(); assert.equal(callbacks.size, 0);
+    } finally {
+      editor.stopPlaybackClock();
+      for (const key of ['paused', 'readyState', 'currentTime', 'pause', 'requestVideoFrameCallback', 'cancelVideoFrameCallback']) delete video[key];
+      if (!videoFrames) { delete view.requestAnimationFrame; delete view.cancelAnimationFrame; }
+      reset();
+    }
+  });
+}

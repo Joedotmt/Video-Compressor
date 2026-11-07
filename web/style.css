@@ -254,7 +254,7 @@ input[aria-invalid="true"] { border-color: var(--error); outline: 1px solid var(
 .trim-handle:hover:not(:disabled), .trim-handle:active { background: transparent; }
 .trim-handle:hover:not(:disabled)::after, .trim-handle:focus-visible::after { border-color: #b8dcff; background: #83b6f433; }
 .trim-handle:active::after { border-color: #d4eaff; background: #83b6f466; }
-#timeline-playhead { position: absolute; top: 21px; bottom: 4px; width: 1px; background: #71b5ff; pointer-events: none; z-index: 3; }
+#timeline-playhead { position: absolute; left: 0; top: 21px; bottom: 4px; width: 1px; background: #71b5ff; pointer-events: none; z-index: 3; will-change: transform; }
 #playhead-handle { position: absolute; top: -14px; left: -12px; width: 25px; height: 28px; min-height: 0; padding: 0; border: 0; background: transparent; pointer-events: auto; touch-action: none; cursor: ew-resize; }
 #playhead-handle::after { content: ''; position: absolute; inset: 3px 5px; background: #71b5ff; clip-path: polygon(0 0, 100% 0, 100% 60%, 50% 100%, 0 60%); }
 #playhead-handle:focus-visible { outline-offset: -1px; }
