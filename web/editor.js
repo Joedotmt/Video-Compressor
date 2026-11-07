@@ -34,7 +34,7 @@ export class VideoEditor {
   dispose() {
     this.video.pause(); this.updatePlayback(false); this.video.removeAttribute('src'); this.video.load();
     if (this.url) URL.revokeObjectURL(this.url);
-    this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishCropDrag?.();
+    this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishCropDrag?.(); this.finishScrub?.();
     this.url = null; this.source = null; this.preview?.reset(); this.spaceHeld = false; $('preview-viewport').classList.remove('space-pan');
   }
   setPreview(blob) {
@@ -42,7 +42,7 @@ export class VideoEditor {
     this.url = URL.createObjectURL(blob); $('preview-unavailable').hidden = true;
     this.video.src = this.url; this.video.load();
   }
-  setBusy(busy) { if (busy) { this.navigation?.finish?.(); this.finishTrimDrag?.(); } this.busy = busy; $('edit-controls').disabled = busy || !this.source; if (busy) this.video.pause(); }
+  setBusy(busy) { if (busy) { this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishScrub?.(); } this.busy = busy; $('edit-controls').disabled = busy || !this.source; if (busy) this.video.pause(); }
   error(text = '') { $('edit-error').textContent = text; }
   getEdits() {
     if (this.points.length && !this.ranges.length) throw new Error('These points do not define a segment. Move or delete a point.');
@@ -165,7 +165,7 @@ export class VideoEditor {
       const body = document.createElement('button'); body.type = 'button'; body.textContent = String(index + 1);
       body.setAttribute('aria-label', `Select segment ${index + 1}`); body.setAttribute('aria-pressed', this.selected === index);
       body.onpointerdown = event => this.dragSegment(event, index);
-      body.onclick = () => this.selectSegment(index); bar.append(body); track.append(bar);
+      body.onclick = event => { this.selectSegment(index); if (event.detail) this.seekTimeline(event); }; bar.append(body); track.append(bar);
     });
     // Actual points remain visible even if another point currently supersedes them.
     // The inferred 0/end boundaries can also be dragged to create explicit points.
@@ -248,10 +248,11 @@ export class VideoEditor {
       this.points.find(p => p.id === endId).time = next.end;
       this.rebuildSegments(startId); this.error(''); this.renderSegments(); this.notify();
     };
-    const end = () => {
+    const end = event => {
       viewport.removeEventListener('pointermove', move);
       for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) viewport.removeEventListener(name, end);
       viewport.classList.remove('moving-segment'); this.trimDragging = false; this.finishTrimDrag = null;
+      if (!moved && event?.type === 'pointerup') this.seekTimeline({ clientX: event.clientX ?? startX });
     };
     this.finishTrimDrag = end;
     viewport.addEventListener('pointermove', move);
@@ -340,9 +341,19 @@ export class VideoEditor {
     const width = viewport.clientWidth || 640;
     this.scrollTimeline(zoomScrollPosition(this.timelineZoom, width, this.source.duration, time, anchor ?? width / 2));
   }
+  seekTimeline(event) {
+    if (this.busy || !this.source || this.trimDragging) return;
+    this.video.pause();
+    this.position(this.xTime(event.clientX - $('timeline-content').getBoundingClientRect().left));
+  }
   scrub(event) {
-    if (this.busy || !this.source || event.button !== 0 || !['timeline-ruler', 'playhead-handle'].includes(event.currentTarget.id)) return;
+    if (this.busy || !this.source || this.trimDragging || event.button !== 0 || !['timeline', 'timeline-ruler', 'playhead-handle'].includes(event.currentTarget.id)) return;
+    if (event.currentTarget.id === 'timeline' && event.target.closest('button')) return;
+    this.finishScrub?.();
     event.preventDefault(); this.video.pause();
+    if (event.currentTarget.id === 'timeline') {
+      this.selected = null; this.activePoint = null; this.renderSegments(); this.notify();
+    }
     const target = event.currentTarget; target.setPointerCapture(event.pointerId);
     const move = e => {
       const viewport = $('timeline-scroll'), view = viewport.getBoundingClientRect();
@@ -350,8 +361,14 @@ export class VideoEditor {
       else if (e.clientX > view.right - 16) this.scrollTimeline(viewport.scrollLeft + 12);
       this.position(this.xTime(e.clientX - $('timeline-content').getBoundingClientRect().left));
     };
-    const end = () => { target.removeEventListener('pointermove', move); target.removeEventListener('lostpointercapture', end); };
-    move(event); target.addEventListener('pointermove', move); target.addEventListener('lostpointercapture', end);
+    const end = () => {
+      target.removeEventListener('pointermove', move);
+      for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) target.removeEventListener(name, end);
+      this.finishScrub = null;
+    };
+    this.finishScrub = end;
+    move(event); target.addEventListener('pointermove', move);
+    for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) target.addEventListener(name, end);
   }
   renderRuler() {
     if (!this.source) return;
@@ -364,7 +381,12 @@ export class VideoEditor {
     const intervals = [1 / this.source.fps, 2 / this.source.fps, 5 / this.source.fps, .5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600].sort((a, b) => a - b);
     const interval = intervals.find(n => n >= target) || Math.ceil(target / 3600) * 3600;
     ruler.replaceChildren();
-    for (let time = Math.ceil(start / interval) * interval; time <= end + 1e-7; time += interval) {
+    // Keep neighboring labels mounted: their text can still be visible after
+    // the tick's center has crossed a viewport edge.
+    const first = Math.max(0, Math.floor(start / interval) - 1);
+    const last = Math.ceil(end / interval) + 1;
+    for (let index = first; index <= last; index++) {
+      const time = index * interval;
       const tick = document.createElement('span'); tick.textContent = `${time < -1e-7 ? '−' : ''}${timecode(Math.abs(time))}`;
       tick.style.left = `${this.timeX(time)}px`;
       tick.classList.toggle('zero', Math.abs(time) < 1e-7);
@@ -388,8 +410,13 @@ export class VideoEditor {
       }
     }, { passive: false });
     $('timeline-ruler').onpointerdown = event => this.scrub(event);
+    $('timeline').onpointerdown = event => this.scrub(event);
     $('playhead-handle').onpointerdown = event => this.scrub(event);
-    $('timeline').onclick = event => { if (!event.target.closest('button')) { this.selected = null; this.activePoint = null; this.renderSegments(); this.notify(); } };
+    $('timeline').onclick = event => {
+      if (this.busy || !this.source || this.trimDragging || event.button !== 0 || event.target.closest('button')) return;
+      this.seekTimeline(event);
+      this.selected = null; this.activePoint = null; this.renderSegments(); this.notify();
+    };
     $('playhead-handle').onkeydown = event => {
       if (this.busy || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault(); event.stopPropagation();

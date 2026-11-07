@@ -64,8 +64,8 @@ and **Export** button share the application header. Choosing another video keeps
 the current tab selected. Processing Details lives in the timeline options (or
 below the compression settings on that tab), without keeping a status bar open.
 
-- Seek by clicking or dragging the timeline ruler, dragging its playhead, or
-  entering an exact playhead time. Clicking the track or a segment never seeks.
+- Seek by clicking or dragging on the timeline background or ruler, clicking a segment, dragging the playhead, or
+  entering an exact playhead time. Dragging segments or trim handles leaves the playhead in place.
 - **I** places an In point and **O** places an Out point, independently of the
   selected segment. Points are paired in time order: a leading Out starts at
   source time zero, and a trailing In runs to the source end. For example, Out

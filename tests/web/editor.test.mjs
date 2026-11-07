@@ -134,7 +134,7 @@ test('points define ranges independently of selected segment', () => {
   editor.selectSegment(2); editor.position(3); key('i');
   assert.equal(editor.points.at(-1).type, 'in'); assert.equal(editor.points.at(-1).time, 3);
 });
-test('clicking the track or selecting a segment does not seek; inspector edits and deletes selection', () => {
+test('track clicks seek and clear selection; inspector edits and deletes selection', () => {
   reset(); assert.equal($('segment-inspector').hidden, true);
   editor.position(2); key('i'); editor.position(4); key('o'); editor.position(6); key('i'); editor.position(8); key('o');
   editor.position(5);
@@ -148,10 +148,60 @@ test('clicking the track or selecting a segment does not seek; inspector edits a
   $('segment-out').value = '3.5'; $('segment-out').dispatchEvent(new dom.window.Event('change'));
   assert.equal(editor.getEdits().segments[0].end, 3.5); assert.equal(editor.playhead, 5);
   $('delete-segment').click(); assert.deepEqual(editor.segments, [{ start: 6, end: 8 }]);
-  $('source-clip').click(); assert.equal(editor.playhead, 5); assert.equal(editor.selected, null);
+  $('timeline-content').getBoundingClientRect = () => ({ left: 0 });
+  $('source-clip').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, clientX: editor.timeX(3) }));
+  assert.equal(editor.playhead, 3); assert.equal(editor.selected, null);
   assert.equal($('segment-fields').hidden, true); assert.equal($('delete-segment').disabled, true);
   assert.equal($('segment-inspector').hidden, true);
-  assert.equal(typeof $('timeline').onpointerdown, 'undefined');
+  assert.equal(typeof $('timeline').onpointerdown, 'function');
+});
+test('timeline clicks account for zoom and scroll, clamp to the source, and ignore busy state', () => {
+  reset(); editor.zoomTimeline(4);
+  $('timeline-content').getBoundingClientRect = () => ({ left: -200 });
+  const click = time => $('timeline').dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, clientX: editor.timeX(time) - 200 }));
+  click(4); assert.equal(editor.playhead, 4);
+  click(-1); assert.equal(editor.playhead, 0);
+  click(11); assert.equal(editor.playhead, 10);
+  editor.setBusy(true); click(2); assert.equal(editor.playhead, 10);
+  editor.setBusy(false);
+});
+test('a segment click seeks after pointer release without moving the segment', () => {
+  reset(); editor.position(2); key('i'); editor.position(6); key('o');
+  const viewport = $('timeline-scroll'); viewport.setPointerCapture = () => {};
+  $('timeline-content').getBoundingClientRect = () => ({ left: -100 });
+  const clientX = editor.timeX(4) - 100;
+  editor.dragSegment({ button: 0, clientX, pointerId: 1, preventDefault() {}, stopPropagation() {} }, 0);
+  viewport.dispatchEvent(new dom.window.MouseEvent('pointerup', { clientX }));
+  assert.equal(editor.playhead, 4); assert.deepEqual(editor.segments, [{ start: 2, end: 6 }]);
+  assert.equal(editor.selected, 0);
+});
+test('holding on the timeline scrubs until release, cancellation, or export', () => {
+  reset(); editor.zoomTimeline(4);
+  const timeline = $('timeline'), viewport = $('timeline-scroll');
+  timeline.setPointerCapture = () => {};
+  viewport.getBoundingClientRect = () => ({ left: -10000, right: 10000 });
+  $('timeline-content').getBoundingClientRect = () => ({ left: -500 });
+  const event = (type, time) => new dom.window.MouseEvent(type, { bubbles: true, button: 0, clientX: editor.timeX(time) - 500 });
+  for (const end of ['pointerup', 'pointercancel', 'lostpointercapture', 'busy']) {
+    timeline.onpointerdown({ target: $('source-clip'), currentTarget: timeline, button: 0, pointerId: 1, clientX: editor.timeX(3) - 500, preventDefault() {} });
+    assert.equal(editor.playhead, 3);
+    timeline.dispatchEvent(event('pointermove', 7)); assert.equal(editor.playhead, 7);
+    if (end === 'busy') editor.setBusy(true);
+    else timeline.dispatchEvent(event(end, 7));
+    timeline.dispatchEvent(event('pointermove', 9)); assert.equal(editor.playhead, 7);
+    editor.setBusy(false);
+  }
+});
+test('ruler keeps partially visible labels on both sides of the viewport', () => {
+  reset(); editor.zoomTimeline(4);
+  const viewport = $('timeline-scroll');
+  Object.defineProperty(viewport, 'clientWidth', { value: 640, configurable: true });
+  viewport.scrollLeft = 40; editor.renderRuler();
+  const labels = () => [...$('timeline-ruler').children].map(tick => tick.textContent);
+  assert.ok(labels().includes('00:00:00.000'));
+  assert.ok(labels().includes('00:00:03.000'));
+  viewport.scrollLeft = editor.timeX(2) + 10; editor.renderRuler();
+  assert.ok(labels().includes('00:00:02.000'));
 });
 test('dragging the playhead scrubs zoomed timelines and clamps outside the source', () => {
   reset(); const handle = $('playhead-handle'); handle.setPointerCapture = () => {};
