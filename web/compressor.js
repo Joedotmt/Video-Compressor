@@ -1,3 +1,4 @@
+import { normalizeEdits } from './edits.js';
 // Toolkit-independent planning; the same bitrate model as compressor.py.
 export const presets = [['Very fast', 'ultrafast'], ['Fast', 'fast'], ['Balanced', 'medium'], ['Slow', 'slow']];
 export const av1Presets = [['Highest quality', '0'], ['Very high quality', '1'], ['High quality', '2'], ['Quality', '3'], ['Balanced', '4'], ['Fast', '5'], ['Fastest', '6']];
@@ -29,9 +30,11 @@ export function metadata(data, size) {
   let fps;
   try { fps = expression(video.avg_frame_rate); } catch { try { fps = expression(video.r_frame_rate); } catch { fps = 30; } }
   if (!(fps > 0)) fps = 30;
-  return { width: video.width, height: video.height, duration, fps, sizeMB: size / 1048576, audio: !!audio, audioKbps: audio ? Math.round(Number(audio.bit_rate) / 1000) || 128 : 0 };
+  const rotation = Number(video.side_data_list?.find(s => s.rotation !== undefined)?.rotation ?? video.tags?.rotate ?? 0);
+  const rotated = Math.abs(Math.round(rotation / 90)) % 2 === 1;
+  return { width: rotated ? video.height : video.width, height: rotated ? video.width : video.height, duration, fps, sizeMB: size / 1048576, audio: !!audio, audioKbps: audio ? Math.round(Number(audio.bit_rate) / 1000) || 128 : 0 };
 }
-export function plan(values, source) {
+export function plan(values, source, edits = null) {
   const ranges = { target: [0.01, 1000000], width: [2, 16384], height: [2, 16384], fps: [0.01, 1000], speed: [0.01, 10000], audioKbps: [1, 10000] };
   const job = { codec: values.codec, preset: values.preset, tune: values.tune, audio: values.audio && source.audio };
   for (const [field, [min, max]] of Object.entries(ranges)) {
@@ -43,7 +46,11 @@ export function plan(values, source) {
   if (!Object.hasOwn(tunes, job.codec)) throw new Error('Choose a supported codec.');
   if (!(job.codec === 'libaom-av1' ? av1Presets : presets).some(p => p[1] === job.preset)) throw new Error('Choose a valid encoding preset.');
   if (!tunes[job.codec].includes(job.tune)) throw new Error('Choose a valid tuning option.');
-  job.duration = source.duration / job.speed;
+  if (edits) {
+    const edit = normalizeEdits(edits, source);
+    job.segments = edit.segments; job.crop = edit.crop; job.sourceDuration = source.duration;
+    job.duration = edit.duration / job.speed;
+  } else job.duration = source.duration / job.speed;
   job.audioBps = Math.round(job.audioKbps * 1000);
   job.videoBps = Math.floor((job.target * 1048576 * 8 / job.duration - job.audioBps) * 0.97);
   if (job.videoBps < 1 || !Number.isFinite(job.videoBps)) { const error = new Error('Target size is too small for the audio. Increase it or remove audio.'); error.field = 'target'; throw error; }
@@ -57,15 +64,36 @@ export function tempo(speed) {
   return factors.map(n => `atempo=${n}`).join(',');
 }
 export function command(job, input, output = 'output.mp4') {
-  const args = ['-y', '-threads', '1', '-filter_threads', '1', '-i', input, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', job.codec];
+  const args = ['-y', '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1', '-i', input];
+  const edited = job.segments && (job.segments.length !== 1 || job.segments[0].start !== 0 || job.segments[0].end !== job.sourceDuration);
+  const crop = job.crop ? `crop=${job.crop.width}:${job.crop.height}:${job.crop.x}:${job.crop.y}:exact=1,` : '';
+  const videoFilter = `${crop}scale=${job.width}:${job.height},setpts=(PTS-STARTPTS)/${job.speed},fps=${job.fps}`;
+  if (edited) {
+    const n = job.segments.length, graph = [];
+    graph.push(`[0:v:0]split=${n}${job.segments.map((_, i) => `[vs${i}]`).join('')}`);
+    if (job.audio) graph.push(`[0:a:0]asplit=${n}${job.segments.map((_, i) => `[as${i}]`).join('')}`);
+    job.segments.forEach((s, i) => {
+      graph.push(`[vs${i}]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS[v${i}]`);
+      if (job.audio) graph.push(`[as${i}]atrim=start=${s.start}:end=${s.end},asetpts=PTS-STARTPTS[a${i}]`);
+    });
+    graph.push(`${job.segments.map((_, i) => `[v${i}]${job.audio ? `[a${i}]` : ''}`).join('')}concat=n=${n}:v=1:a=${job.audio ? 1 : 0}[joinedv]${job.audio ? '[joineda]' : ''}`);
+    graph.push(`[joinedv]${videoFilter}[outv]`);
+    if (job.audio) graph.push(`[joineda]${tempo(job.speed) || 'anull'}[outa]`);
+    args.push('-filter_complex', graph.join(';'), '-map', '[outv]');
+    if (job.audio) args.push('-map', '[outa]');
+  } else {
+    args.push('-map', '0:v:0', '-map', '0:a:0?', '-vf', videoFilter);
+    if (job.audio && tempo(job.speed)) args.push('-af', tempo(job.speed));
+  }
+  args.push('-c:v', job.codec);
   args.push(...(job.codec === 'libaom-av1' ? ['-cpu-used', job.preset] : ['-preset', job.preset]));
   if (job.tune && job.codec !== 'libaom-av1') args.push('-tune', job.tune);
   if (job.codec === 'libx265') args.push('-tag:v', 'hvc1', '-x265-params', 'pools=none:frame-threads=1');
   args.push('-threads', '1', '-b:v', String(job.videoBps), '-pix_fmt', 'yuv420p');
   if (!job.audio) args.push('-an');
-  else { args.push('-c:a', 'aac', '-b:a', String(job.audioBps)); if (tempo(job.speed)) args.push('-af', tempo(job.speed)); }
+  else args.push('-c:a', 'aac', '-b:a', String(job.audioBps));
   // Retiming before fps keeps the requested output frame rate at altered speeds.
-  args.push('-vf', `scale=${job.width}:${job.height},setpts=(PTS-STARTPTS)/${job.speed},fps=${job.fps}`, '-movflags', '+faststart', output);
+  args.push('-movflags', '+faststart', output);
   return args;
 }
 export const durationLabel = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;

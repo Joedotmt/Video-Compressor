@@ -56,6 +56,64 @@ single-threaded engines.
 
 The original Python/GTK implementation remains available. See [desktop setup](docs/DESKTOP.md).
 
+## Trim & Crop
+
+Open a video and select the **Trim & Crop** tab. Compression settings and edits
+share the same export; the original file is never modified.
+
+- Seek by clicking or dragging the timeline ruler, dragging its playhead, or
+  entering an exact playhead time. Clicking the track or a segment never seeks.
+- **I** places an In point and **O** places an Out point, independently of the
+  selected segment. Points are paired in time order: a leading Out starts at
+  source time zero, and a trailing In runs to the source end. For example, Out
+  at frame 50, In at 100, Out at 150 and In at 200 produce 0–50, 100–150 and
+  200–end.
+- Repeating **I** or **O** moves the nearby point of the same type to the playhead,
+  instead of leaving an extra point. For example, I at frame 10, O at 20, then
+  O at 30 produces 10–30. An opposite point between the marks separates them:
+  I after an Out or O before an In still creates another segment.
+- Select a segment to edit its exact In/Out timecodes or delete it in the
+  inspector. Dragging a boundary uses your initial grab offset and does not
+  move the playhead. The inspector also contains the **Keep/Remove** setting
+  for all marked segments and the kept-segments preview option. No points means
+  the whole video. Segments export in source order, with overlaps merged.
+- **B** splits a segment; **Delete** deletes the selected segment. **Space** plays
+  or pauses, arrows seek, and comma/period step by nominal frame duration. Time
+  fields accept seconds or `HH:MM:SS.mmm`. Shortcuts do not interrupt text entry.
+- The crop rectangle is always visible, starting with the full frame. Move it or
+  drag its edges/corners. Reset restores the full frame. Use
+  Free, Original, square, landscape or portrait aspect ratios, or enter exact
+  **X, Y, Width, Height** in original-video pixels (arithmetic is supported).
+  Exact dimension edits switch to Free. Arrow keys move the focused crop or its
+  handles by one pixel; Shift moves ten.
+- Zoom the timeline around the playhead with **= / +** and **−**, or its zoom
+  slider. **\** fits the whole video. Scroll horizontally to pan; **Alt + wheel**
+  zooms around the pointer. Scrollable space before and after the source gives
+  room to navigate. Drag the blue playhead to scrub and the In/Out handles on
+  the clip to adjust the points.
+- The preview has independent zoom and pan: wheel to zoom around the pointer,
+  **Space-drag**, middle-drag, or **Hand (H)** to pan, and **Z** to fit the whole
+  video. **Crop (V)** returns to editing the rectangle. Enter a magnification
+  between 1% and 6400%, or use the +/− buttons. Changing the crop never moves
+  the view, and changing the view never affects exported pixels.
+- On mobile, pinch to zoom and pan the preview, use Hand for one-finger panning,
+  and use the visible timeline zoom controls. Swipe the track to scroll; drag
+  the playhead or use the seek slider to scrub. The crop inspector moves below
+  the timeline on narrow screens.
+- Output dimensions follow the crop until you manually edit the resize settings.
+  Video Reset uses the current crop dimensions. The target-size budget uses the
+  total kept duration, adjusted for playback speed.
+- If the browser cannot play the source, **Create Compatible Preview** makes a
+  local low-resolution H.264 preview; exports still use the original file.
+
+All exports are re-encoded, including trim-only edits; this is not lossless stream
+copying. Preview seeking/frame stepping depends on browser support and the source
+frame rate. The exported cuts are applied by FFmpeg. Edits are kept for the current
+file only and reset when another video is opened or the page is reloaded.
+
+Interaction references: [LosslessCut's segment editing](https://github.com/mifi/lossless-cut/blob/master/docs/getting-started.md)
+and [Google Photos cropping](https://support.google.com/photos/answer/10729480).
+
 ## Browser differences
 
 - Encoding is CPU-based and slower than native FFmpeg; AV1 can be particularly slow.
@@ -87,6 +145,8 @@ python3 -m unittest discover -v
 
 The smoke test performs actual WASM encodes for H.264, HEVC and AV1, then verifies
 codec, dimensions, audio presence, frame rate and speed-adjusted duration.
+Additional tests cover edit geometry, time ranges, keyboard shortcuts, tab state, and export integration.
+Edited WASM exports are checked against an independent native reference for frame content.
 The worker test also verifies cancellation, discarded partial output and retry.
 These are engine integration tests; it does not replace a visual browser/UI test.
 
@@ -94,6 +154,7 @@ These are engine integration tests; it does not replace a visual browser/UI test
 
 - `web/app.js`: interface, file selection, state, progress, cancellation and downloads.
 - `web/engine.js`: browser-worker FFmpeg loading and read-only file mounts.
+- `web/editor.js` and `web/edits.js`: crop geometry, multi-segment editing, preview and keyboard controls.
 - `web/compressor.js`: safe expressions, metadata, validation and command planning.
 - `scripts/prepare-engine.mjs`: copy pinned engines and fix upstream FFprobe return handling.
 - `vendor/av1/`: prebuilt, reproducible AV1 companion engine (standard FFmpeg.wasm omits AV1 encoding).

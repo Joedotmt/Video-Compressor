@@ -10,6 +10,10 @@
 <body>
   <header class="app-header"><h1>Joemt Video Compressor</h1></header>
   <main>
+    <nav class="tabs" role="tablist" aria-label="Video tools">
+      <button id="compression-tab" role="tab" aria-selected="true" aria-controls="compression-panel" type="button">Compression</button>
+      <button id="edit-tab" role="tab" aria-selected="false" aria-controls="edit-panel" tabindex="-1" type="button" disabled>Trim &amp; Crop</button>
+    </nav>
     <input id="file" type="file" accept="video/*,.mkv,.avi,.mov,.m4v,.mts,.m2ts,.ts,.webm" hidden>
     <section id="empty-state">
       <p>Open a video or drop one here.</p>
@@ -17,7 +21,7 @@
     </section>
 
     <div id="editor" hidden>
-      <section aria-labelledby="input-heading">
+      <section id="source-group" aria-labelledby="input-heading">
         <div class="section-heading"><h2 id="input-heading">Input Video</h2></div>
         <div class="preference-list">
         <div class="row">
@@ -30,6 +34,7 @@
         </div>
       </section>
 
+      <div id="compression-panel" role="tabpanel" aria-labelledby="compression-tab">
       <form id="settings" novalidate>
         <fieldset id="controls" disabled>
           <section aria-labelledby="output-heading">
@@ -87,11 +92,127 @@
 
           <div class="preference-list"><div class="row save-row"><label for="output-name">Save As</label><input id="output-name" value="video_compressed.mp4" maxlength="180"></div></div>
         </fieldset>
-        <p id="validation" class="error" role="alert"></p>
       </form>
+      </div>
+      <section id="edit-panel" role="tabpanel" aria-labelledby="edit-tab" hidden>
+        <fieldset id="edit-controls" disabled>
+          <section class="monitor-panel" aria-label="Source monitor">
+            <div class="monitor-toolbar">
+              <div class="view-tools" role="group" aria-label="Preview tool">
+                <button id="preview-crop-tool" type="button" aria-pressed="true" title="Edit crop (V)">Crop</button>
+                <button id="preview-hand-tool" type="button" aria-pressed="false" title="Pan view (H)">Hand</button>
+              </div>
+              <div class="magnification">
+                <button id="preview-zoom-out" type="button" aria-label="Zoom preview out">−</button>
+                <label><input id="preview-zoom" type="number" min="1" max="6400" step="any" value="100" aria-label="Preview zoom percent">%</label>
+                <button id="preview-zoom-in" type="button" aria-label="Zoom preview in">+</button>
+                <button id="preview-fit" type="button" title="Fit video (Z)">Fit <kbd>Z</kbd></button>
+              </div>
+            </div>
+          <div id="preview-viewport" class="preview-area" tabindex="0" aria-label="Video preview. Wheel to zoom, Space-drag to pan, Z to fit.">
+            <div id="preview-canvas">
+            <div id="video-stage">
+              <video id="edit-video" playsinline preload="metadata"></video>
+              <div id="crop-overlay">
+                <div id="crop-box" tabindex="0" role="group" aria-label="Crop rectangle. Use arrow keys to move; Shift for 10 pixels.">
+                  <span class="crop-grid" aria-hidden="true"></span>
+                  <button class="crop-handle nw" data-handle="nw" type="button" aria-label="Resize crop from top left"></button>
+                  <button class="crop-handle n" data-handle="n" type="button" aria-label="Resize crop from top"></button>
+                  <button class="crop-handle ne" data-handle="ne" type="button" aria-label="Resize crop from top right"></button>
+                  <button class="crop-handle e" data-handle="e" type="button" aria-label="Resize crop from right"></button>
+                  <button class="crop-handle se" data-handle="se" type="button" aria-label="Resize crop from bottom right"></button>
+                  <button class="crop-handle s" data-handle="s" type="button" aria-label="Resize crop from bottom"></button>
+                  <button class="crop-handle sw" data-handle="sw" type="button" aria-label="Resize crop from bottom left"></button>
+                  <button class="crop-handle w" data-handle="w" type="button" aria-label="Resize crop from left"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+          <div id="preview-unavailable" hidden>
+            <p class="description">This browser cannot play this source format. Create a compatible preview to edit visually. Export uses the original video.</p>
+            <button id="make-preview" type="button">Create Compatible Preview</button>
+          </div>
+          <div class="transport">
+            <button id="play" type="button">Play</button>
+            <button id="step-back" type="button" title="Previous frame (comma)">−1 frame</button>
+            <button id="step-forward" type="button" title="Next frame (period)">+1 frame</button>
+            <label class="time-jump">Position <input id="playhead-time" value="00:00:00.000" aria-label="Playhead time"></label>
+            <span id="video-duration" class="description"></span>
+          </div>
+          </section>
+          <section class="crop-inspector" aria-labelledby="crop-heading">
+            <div class="section-heading"><h2 id="crop-heading">Crop</h2><button id="reset-crop" type="button">Reset</button></div>
+            <div class="preference-list">
+              <div class="row"><label for="crop-ratio">Aspect Ratio</label><select id="crop-ratio"><option value="0">Free</option><option value="original">Original</option><option value="1">1:1</option><option value="1.7777777777777777">16:9</option><option value="0.5625">9:16</option><option value="1.3333333333333333">4:3</option><option value="0.75">3:4</option></select></div>
+              <div class="crop-numbers">
+                <label>X <input id="crop-x" inputmode="decimal" value="0"></label>
+                <label>Y <input id="crop-y" inputmode="decimal" value="0"></label>
+                <label>Width <input id="crop-width" inputmode="decimal" value="0"></label>
+                <label>Height <input id="crop-height" inputmode="decimal" value="0"></label>
+              </div>
+            </div>
+            <section id="segment-inspector" aria-labelledby="segment-heading">
+              <div class="section-heading"><h2 id="segment-heading">Segment</h2><button id="delete-segment" type="button" disabled>Delete</button></div>
+              <p id="segment-empty" class="description">Select a segment.</p>
+              <div id="segment-fields" hidden>
+                <label>In <input id="segment-in" value="00:00:00.000" aria-label="Selected segment In"></label>
+                <label>Out <input id="segment-out" value="00:00:00.000" aria-label="Selected segment Out"></label>
+                <div class="segment-duration"><span>Duration</span><output id="segment-duration"></output></div>
+              </div>
+              <div id="point-fields" hidden>
+                <label><span id="point-label">Point</span><input id="point-time" aria-label="Selected point time"></label>
+              </div>
+            </section>
+            <section class="trim-settings" aria-label="Trim settings">
+              <div class="row"><label for="trim-mode">Marked Segments</label><select id="trim-mode"><option value="keep">Keep</option><option value="remove">Remove</option></select></div>
+                <label class="preview-selection"><input id="preview-kept" type="checkbox"> Preview kept segments only</label>
+            </section>
+          </section>
+          <section class="timeline-panel" aria-label="Timeline editor">
+          <div class="zoom-toolbar timeline-toolbar">
+            <strong>Timeline</strong>
+            <button id="timeline-zoom-out" type="button" aria-label="Zoom timeline out" title="Zoom Out (−)">−</button>
+            <input id="timeline-zoom" type="range" min="-2" max="12" step="0.25" value="0" aria-label="Timeline zoom">
+            <button id="timeline-zoom-in" type="button" aria-label="Zoom timeline in" title="Zoom In (=)">+</button>
+            <button id="timeline-fit" type="button" title="Fit timeline (backslash)">Fit</button>
+            <output id="timeline-zoom-label">1×</output>
+          </div>
+          <div id="timeline-scroll" tabindex="0" role="group" aria-label="Timeline. Equals and minus to zoom; backslash to fit. Scroll to pan.">
+            <div id="timeline-content">
+              <div id="timeline-ruler" aria-label="Time ruler"></div>
+              <div id="timeline" aria-label="Marked video segments">
+                <div id="source-clip"></div>
+                <div id="timeline-segments"></div>
+                <div id="timeline-points"></div>
+              </div>
+              <div id="timeline-playhead"><button id="playhead-handle" type="button" role="slider" aria-label="Playhead" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"></button></div>
+              <input id="seek" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek video">
+            </div>
+          </div>
+
+
+          <section aria-labelledby="trim-heading">
+            <h2 id="trim-heading" class="visually-hidden">Trim</h2>
+            <div class="trim-toolbar">
+              <button id="mark-in" type="button">Set In (I)</button>
+              <button id="mark-out" type="button">Set Out (O)</button>
+              <button id="split-segment" type="button" title="Split at playhead (B)">Split</button><button id="reset-trim" type="button">Reset</button>
+            </div>
+            <p id="trim-summary" class="description" aria-live="polite">No cuts. The full video will be kept.</p>
+            <details class="shortcut-help"><summary>Keyboard Shortcuts</summary><p class="description">I: Add In point · O: Add Out point · =/−: Timeline zoom · \: Fit timeline · B: Split · Delete: Remove selected segment · Z: Fit video · H/V: Hand/Crop tool · Space: Play/Pause (hold and drag to pan) · ←/→: Seek 1 second · ,/.: Step by nominal frame duration. Shortcuts are active in this tab outside text fields. Times accept seconds or HH:MM:SS.mmm.</p></details>
+          </section>
+
+          </section>
+
+        </fieldset>
+        <p id="edit-error" class="error" role="alert"></p>
+      </section>
+      <p id="edit-summary" class="description" hidden></p>
     </div>
 
     <div class="bottom-bar">
+      <p id="validation" class="error" role="alert"></p>
       <div id="activity" hidden>
         <p id="activity-title">Preparing…</p>
         <progress id="progress" max="100" value="0"></progress>

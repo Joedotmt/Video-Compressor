@@ -1,10 +1,13 @@
 import { plan, presets, av1Presets, tunes, durationLabel } from './compressor.js';
 import { BrowserCompressor } from './engine.js';
+import { VideoEditor } from './editor.js';
 import { initializeIsolation } from './isolation.js';
 const $ = id => document.getElementById(id);
 const fields = ['target', 'width', 'height', 'fps', 'speed', 'audioKbps', 'codec', 'preset', 'tune'];
 let initializing = true;
+let automaticDimensions = true;
 let file = null, source = null, job = null, busy = false, runner = null, outputURL = null, logs = [], started = 0;
+const editor = new VideoEditor(editsChanged, makePreview);
 const number = n => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 const message = (text = '', error = false) => { $('message').textContent = text; $('message').classList.toggle('error', error); };
 function log(line) { logs.push(line); if (logs.length > 200) logs.shift(); $('logs').textContent = logs.join('\n'); $('diagnostics').hidden = false; }
@@ -24,8 +27,11 @@ function validate() {
   $('audioKbps').disabled = !$('audio').checked || !source?.audio;
   if (source) {
     try {
-      job = plan({ ...Object.fromEntries(fields.map(id => [id, $(id).value])), audio: $('audio').checked }, source);
+      job = plan({ ...Object.fromEntries(fields.map(id => [id, $(id).value])), audio: $('audio').checked }, source, editor.getEdits());
       if (!$('output-name').value.trim() || /[/\\\x00-\x1f]/.test($('output-name').value)) { job = null; throw new Error('Enter a filename without slashes or control characters.'); }
+      const hasEdits = editor.segments.length > 0 || editor.hasCrop();
+      $('edit-summary').hidden = !hasEdits;
+      $('edit-summary').textContent = hasEdits ? `Edits: ${durationLabel(job.duration)} output · crop ${job.crop.width} × ${job.crop.height} at ${job.crop.x}, ${job.crop.y}. Applied when compressing.` : '';
       $('bitrate').textContent = `${number(job.videoBps / 1000)} kbps`;
       $('output-summary').textContent = `${job.width} × ${job.height} · ${number(job.fps)} fps · ${durationLabel(job.duration)} output`;
     } catch (error) { $('validation').textContent = error.message; if (error.field) $(error.field).setAttribute('aria-invalid', 'true'); $('bitrate').textContent = '—'; }
@@ -34,6 +40,8 @@ function validate() {
 }
 function setBusy(value) {
   busy = value; $('controls').disabled = value || !source;
+  editor.setBusy(value);
+  $('edit-tab').disabled = !source;
   $('dropzone').disabled = value; $('replace').disabled = value;
   $('activity').hidden = !value; $('cancel').disabled = false;
   $('cancel').hidden = !value;
@@ -59,13 +67,14 @@ async function openFile(selected) {
   if (!selected.size) { message('This file is empty. Choose a video file.', true); return; }
   // Memory32 FFmpeg cannot address files of 2 GiB or more.
   if (selected.size >= 2 * 1024 ** 3) { message('This video exceeds the browser engine’s 2 GB file limit. Use a smaller source video.', true); return; }
-  clearOutput(); message(); source = null; file = null;
+  clearOutput(); message(); editor.dispose(); source = null; file = null;
+  showTab('compression');
   setBusy(true); activity('Reading video…', 'Loading the local video engine. The first download is about 32 MB.');
   const task = newRunner(); runner = task;
   try {
     const info = await task.probe(selected);
     if (task.cancelled) return;
-    source = info; file = selected;
+    source = info; file = selected; automaticDimensions = true; editor.reset(file, source);
     $('filename').textContent = file.name;
     $('source-summary').textContent = `${source.width} × ${source.height} · ${number(source.fps)} fps · ${durationLabel(source.duration)} · ${number(source.sizeMB)} MB`;
     $('target').value = Math.max(.01, source.sizeMB).toFixed(2);
@@ -75,7 +84,49 @@ async function openFile(selected) {
   } catch (error) { if (!task.cancelled) message(error.message || 'Could not read the video.', true); }
   finally { runner = null; setBusy(false); }
 }
-function resetVideo() { if (!source) return; for (const key of ['width', 'height', 'fps']) $(key).value = String(source[key]); }
+function resetVideo() {
+  if (!source) return;
+  automaticDimensions = true;
+  const dimensions = editor.crop || source;
+  $('width').value = String(dimensions.width); $('height').value = String(dimensions.height); $('fps').value = String(source.fps);
+}
+function editsChanged() {
+  if (!source) return;
+  if (automaticDimensions) {
+    const dimensions = editor.crop || source;
+    $('width').value = String(dimensions.width); $('height').value = String(dimensions.height);
+  }
+  clearOutput(); validate();
+}
+function showTab(name) {
+  document.body.classList.toggle('editing', name === 'edit');
+  for (const tab of ['compression', 'edit']) {
+    const active = tab === name;
+    $(`${tab}-tab`).setAttribute('aria-selected', String(active));
+    $(`${tab}-tab`).tabIndex = active ? 0 : -1;
+    $(`${tab}-panel`).hidden = !active;
+  }
+  if (name !== 'edit') editor.video.pause();
+  else editor.refreshView();
+}
+async function makePreview() {
+  if (busy || !source) return;
+  message(); setBusy(true); started = Date.now(); activity('Creating preview…', 'The original video will be used for export.');
+  const task = newRunner(source.duration); runner = task;
+  try {
+    const preview = await task.preview(file, source);
+    if (!task.cancelled) editor.setPreview(preview);
+  } catch (error) { if (!task.cancelled) message(error.message || 'Could not create a compatible preview.', true); }
+  finally { runner = null; setBusy(false); }
+}
+for (const name of ['compression', 'edit']) {
+  $(`${name}-tab`).onclick = () => showTab(name);
+  $(`${name}-tab`).onkeydown = event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || $('edit-tab').disabled) return;
+    event.preventDefault(); event.stopPropagation(); const next = event.key === 'Home' ? 'compression' : event.key === 'End' ? 'edit' : name === 'edit' ? 'compression' : 'edit';
+    showTab(next); $(`${next}-tab`).focus();
+  };
+}
 function resetAudio() { if (!source) return; $('audio').checked = source.audio; $('audioKbps').value = source.audioKbps || 128; }
 $('file').addEventListener('change', event => { openFile(event.target.files[0]); event.target.value = ''; });
 for (const id of ['dropzone', 'replace']) $(id).addEventListener('click', () => { if (!busy && !initializing) $('file').click(); });
@@ -84,7 +135,7 @@ document.addEventListener('dragover', event => { event.preventDefault(); if (!bu
 document.addEventListener('dragleave', event => { if (!event.relatedTarget) document.querySelector('main').classList.remove('dragover'); });
 document.addEventListener('drop', event => { event.preventDefault(); document.querySelector('main').classList.remove('dragover'); if (!busy) openFile(event.dataTransfer.files[0]); });
 $('codec').addEventListener('change', () => { encoderOptions(); validate(); });
-$('settings').addEventListener('input', validate);
+$('settings').addEventListener('input', event => { if (['width', 'height'].includes(event.target.id)) automaticDimensions = false; validate(); });
 $('reset-target').addEventListener('click', () => { $('target').value = Math.max(.01, source.sizeMB).toFixed(2); validate(); });
 $('reset-video').addEventListener('click', () => { resetVideo(); validate(); });
 $('reset-audio').addEventListener('click', () => { resetAudio(); validate(); });

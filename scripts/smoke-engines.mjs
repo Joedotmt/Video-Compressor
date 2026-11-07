@@ -37,6 +37,25 @@ try {
     assert.equal(video.width, 96); assert.equal(video.height, 64); assert.equal(video.avg_frame_rate, '10/1');
     assert.ok(Math.abs(Number(result.format.duration) - 1) < .25);
     assert.equal(result.streams.some(s => s.codec_type === 'audio'), job.audio);
+    f.reset();
+    const editJob = plan({ target: '.05', width: '96', height: '64', fps: '12', speed: '2', audioKbps: '64', audio: codec !== 'libx265', codec, preset: codec === 'libaom-av1' ? '6' : 'ultrafast', tune: '' }, info, {
+      segments: [{ start: .25, end: .75 }, { start: 1.25, end: 1.75 }],
+      crop: { x: 11, y: 13, width: 96, height: 64 },
+    });
+    f.exec(...command(editJob, '/input.mp4', 'edited.mp4'));
+    assert.equal(f.ret, 0, `${codec} edits: ${logs.slice(-30).join('\n')}`);
+    const editedPath = join(directory, `${codec}-edited.mp4`);
+    await writeFile(editedPath, f.FS.readFile('edited.mp4'));
+    const editedInfo = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_format', '-show_streams', '-of', 'json', editedPath], { encoding: 'utf8' }));
+    assert.ok(Math.abs(Number(editedInfo.format.duration) - .5) < .15, 'trim and speed duration');
+    assert.equal(editedInfo.streams.some(s => s.codec_type === 'audio'), editJob.audio);
+    const decoded = execFileSync('ffmpeg', ['-v', 'error', '-threads', '1', '-i', editedPath, '-an', '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-']);
+    // Independent native reference: select frames rather than trim/concat.
+    const expected = execFileSync('ffmpeg', ['-v', 'error', '-i', input, '-an', '-vf', "select='between(t,0.25,0.74999)+between(t,1.25,1.74999)',setpts=N/(24*TB),crop=96:64:11:13:exact=1,fps=12", '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-']);
+    assert.equal(decoded.length, expected.length, `${codec}: output frame count`);
+    const error = decoded.reduce((total, byte, i) => total + Math.abs(byte - expected[i]), 0) / decoded.length;
+    assert.ok(error < 12, `${codec}: cropped/trimmed image difference ${error}`);
+    console.log(`${codec}: two joined segments, exact crop position, 2× speed and decoded frame content verified (mean RGB error ${error.toFixed(2)})`);
     f.PThread?.terminateAllThreads();
     console.log(`${codec}: encoded and verified dimensions, frame rate, 2× speed, audio and MP4 output (${result.format.size} bytes)`);
   }

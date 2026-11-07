@@ -30,6 +30,15 @@ export class BrowserCompressor {
       return metadata(JSON.parse(await f.readFile('/probe.json', 'utf8')), file.size);
     } finally { this.ffmpeg?.terminate(); this.ffmpeg = null; }
   }
+  async preview(file, source) {
+    try {
+      const f = await this.load(); const input = await this.mount(f, file);
+      const width = Math.max(2, Math.floor(Math.min(640, source.width) / 2) * 2);
+      const code = await f.exec(['-y', '-threads', '1', '-filter_threads', '1', '-i', input, '-map', '0:v:0', '-map', '0:a:0?', '-vf', `scale=${width}:-2,fps=${Math.min(30, source.fps)}`, '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '96000', '-movflags', '+faststart', 'preview.mp4']);
+      if (code !== 0) throw new Error('Could not create a preview for this source format. See processing details.');
+      return new Blob([await f.readFile('preview.mp4')], { type: 'video/mp4' });
+    } finally { this.ffmpeg?.terminate(); this.ffmpeg = null; }
+  }
   async compress(file, job) {
     try {
       const f = await this.load(job.codec); const input = await this.mount(f, file);
