@@ -135,9 +135,11 @@ test('points define ranges independently of selected segment', () => {
   assert.equal(editor.points.at(-1).type, 'in'); assert.equal(editor.points.at(-1).time, 3);
 });
 test('clicking the track or selecting a segment does not seek; inspector edits and deletes selection', () => {
-  reset(); editor.position(2); key('i'); editor.position(4); key('o'); editor.position(6); key('i'); editor.position(8); key('o');
+  reset(); assert.equal($('segment-inspector').hidden, true);
+  editor.position(2); key('i'); editor.position(4); key('o'); editor.position(6); key('i'); editor.position(8); key('o');
   editor.position(5);
   document.querySelector('[aria-label="Select segment 1"]').click();
+  assert.equal($('segment-inspector').hidden, false);
   assert.equal(editor.playhead, 5); assert.equal($('segment-in').value, '00:00:02.000');
   assert.equal($('segment-out').value, '00:00:04.000'); assert.equal($('segment-duration').textContent, '00:00:02.000');
   assert.ok($('segment-in').closest('.timeline-footer')); assert.ok($('trim-mode').closest('.timeline-footer'));
@@ -148,6 +150,7 @@ test('clicking the track or selecting a segment does not seek; inspector edits a
   $('delete-segment').click(); assert.deepEqual(editor.segments, [{ start: 6, end: 8 }]);
   $('source-clip').click(); assert.equal(editor.playhead, 5); assert.equal(editor.selected, null);
   assert.equal($('segment-fields').hidden, true); assert.equal($('delete-segment').disabled, true);
+  assert.equal($('segment-inspector').hidden, true);
   assert.equal(typeof $('timeline').onpointerdown, 'undefined');
 });
 test('dragging the playhead scrubs zoomed timelines and clamps outside the source', () => {

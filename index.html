@@ -431,13 +431,13 @@
                 </div>
                 <div class="transport-buttons" role="group" aria-label="Playback controls">
                   <button id="step-back" class="icon-button" type="button" aria-label="Previous frame" title="Previous frame (comma)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h2v14H5z M18 5v14L8 12z" /></svg>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17 5h2v14h-2z M15 5v14L5 12z" /></svg>
                   </button>
                   <button id="play" class="icon-button" type="button" aria-label="Play" title="Play (Space)" data-playing="false">
                     <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="play-glyph" d="M8 5l11 7-11 7z" /><path class="pause-glyph" d="M6 5h4v14H6z M14 5h4v14h-4z" /></svg>
                   </button>
                   <button id="step-forward" class="icon-button" type="button" aria-label="Next frame" title="Next frame (period)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17 5h2v14h-2z M6 5l10 7-10 7z" /></svg>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h2v14H5z M9 5l10 7-10 7z" /></svg>
                   </button>
                 </div>
                 <span id="video-duration" class="description"></span>
@@ -536,16 +536,11 @@
                   <section
                     id="segment-inspector"
                     aria-labelledby="segment-heading"
+                    hidden
                   >
                     <div class="section-heading">
                       <h2 id="segment-heading">Segment</h2>
                     </div>
-                    <button id="delete-segment" type="button" disabled>
-                      Delete
-                    </button>
-                    <p id="segment-empty" class="description">
-                      Select a segment.
-                    </p>
                     <div id="segment-fields" hidden>
                       <label
                         >In
@@ -574,6 +569,9 @@
                           aria-label="Selected point time"
                       /></label>
                     </div>
+                    <button id="delete-segment" type="button" disabled>
+                      Delete
+                    </button>
                   </section>
                 </div>
                 <div class="timeline-options">

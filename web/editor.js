@@ -145,7 +145,7 @@ export class VideoEditor {
     const segment = this.ranges[this.selected];
     const point = this.points.find(p => p.id === this.activePoint);
     $('segment-heading').textContent = segment ? `Segment ${this.selected + 1}` : point ? `${point.type === 'in' ? 'In' : 'Out'} Point` : 'Segment';
-    $('segment-empty').hidden = !!segment || !!point;
+    $('segment-inspector').hidden = !segment && !point;
     $('segment-fields').hidden = !segment; $('point-fields').hidden = !!segment || !point;
     $('delete-segment').disabled = !segment && !point;
     for (const [key, id] of [['start', 'segment-in'], ['end', 'segment-out']]) {
