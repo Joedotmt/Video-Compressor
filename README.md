@@ -103,8 +103,11 @@ and **Export** button share the application header.
   the view, and changing the view never affects exported pixels.
 - On mobile, pinch to zoom and pan the preview, use Hand for one-finger panning,
   and drag the timeline scrollbar ends to zoom. Drag the playhead or use the
-  seek slider to scrub. Crop controls sit in a collapsible overlay at the
-  top right of the preview, initially collapsed on mobile. Desktop editing
+  seek slider to scrub. Crop controls form a collapsible horizontal strip,
+  initially collapsed on mobile. At fit it sits above the video without covering
+  it; when zoomed, it anchors near the crop’s top-left corner and stays within
+  the preview. The strip stays still during dragging or field editing. On narrow
+  screens its controls scroll horizontally. Desktop editing
   fills the window, with scrolling confined to controls or status when necessary.
 - Output dimensions follow the crop until you manually edit the resize settings.
   Video Reset uses the current crop dimensions. The target-size budget uses the

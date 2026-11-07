@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeEdits, segmentsFromPoints, dragCrop, fitRatio, parseTime, timecode, zoomScrollPosition, previewGeometry, timelineGeometry, moveSegment, zoomPreviewAt } from '../../web/edits.js';
+import { normalizeEdits, segmentsFromPoints, dragCrop, fitRatio, parseTime, timecode, zoomScrollPosition, previewGeometry, timelineGeometry, moveSegment, zoomPreviewAt, cropControlsPosition } from '../../web/edits.js';
 import { plan, command, metadata } from '../../web/compressor.js';
 const source = { duration: 20, width: 1920, height: 1080, audio: true };
 test('kept ranges are sorted and overlaps merged; removed ranges are inverted', () => {
@@ -118,5 +118,31 @@ test('preview pan stays within video edges and zooming below fit centers every a
       assert.ok(Math.abs(fit.left + fit.width / 2 - 320) < 1e-8);
       assert.ok(Math.abs(fit.top + fit.height / 2 - 240) < 1e-8);
     }
+  }
+});
+
+test('fitted preview reserves clear space for the horizontal crop strip on desktop and mobile', () => {
+  for (const source of [{ width: 1920, height: 1080 }, { width: 1080, height: 1920 }]) {
+    for (const viewport of [{ width: 1280, height: 720 }, { width: 360, height: 240 }]) {
+      const controls = { width: Math.min(560, viewport.width - 16), height: 50 };
+      const geometry = previewGeometry(source, viewport.width, viewport.height, null, null, controls.height);
+      for (const crop of [{ x: 0, y: 0 }, { x: source.width / 2, y: source.height / 2 }]) {
+        const pos = cropControlsPosition(geometry, crop, viewport, controls, true);
+        assert.ok(pos.top >= 8 && pos.left >= 8);
+        assert.ok(pos.left + controls.width <= viewport.width - 8);
+        assert.ok(pos.top + controls.height <= geometry.top - 16 + 1e-8);
+        assert.ok(Math.abs(geometry.top + geometry.height / 2 - viewport.height / 2) < 1e-8);
+      }
+    }
+  }
+});
+test('zoomed crop strip follows the top-left crop corner and stays inside the viewport', () => {
+  const geometry = { left: -100, top: -100, scale: 2 };
+  const controls = { width: 300, height: 40 }, viewport = { width: 800, height: 600 };
+  assert.deepEqual(cropControlsPosition(geometry, { x: 200, y: 200 }, viewport, controls, false), { left: 300, top: 244 });
+  for (const crop of [{ x: -100, y: -100 }, { x: 1000, y: 1000 }]) {
+    const pos = cropControlsPosition(geometry, crop, viewport, controls, false);
+    assert.ok(pos.left >= 8 && pos.left + controls.width <= 792);
+    assert.ok(pos.top >= 8 && pos.top + controls.height <= 592);
   }
 });

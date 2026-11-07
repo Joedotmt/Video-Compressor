@@ -316,3 +316,23 @@ test('crop overlay controls remain editable without triggering preview pan or zo
   $('crop-width').value = '320'; $('crop-width').dispatchEvent(new dom.window.Event('input'));
   assert.equal(editor.getEdits().crop.width, 320);
 });
+
+test('crop strip stays still during dragging and field editing, and clears the video at fit', () => {
+  reset();
+  const inspector = $('inspector');
+  Object.defineProperty(inspector, 'offsetWidth', { value: 300, configurable: true });
+  Object.defineProperty(inspector, 'offsetHeight', { value: 40, configurable: true });
+  editor.crop = { x: 200, y: 200, width: 200, height: 200 };
+  editor.preview.zoom(2); editor.renderCrop();
+  const old = { left: inspector.style.left, top: inspector.style.top };
+  editor.cropDragging = true; editor.crop.x += 10; editor.renderCrop();
+  assert.deepEqual({ left: inspector.style.left, top: inspector.style.top }, old);
+  editor.cropDragging = false; editor.renderCrop();
+  assert.notEqual(inspector.style.left, old.left);
+  $('crop-x').focus(); const left = inspector.style.left;
+  editor.crop.x += 10; editor.renderCrop(); assert.equal(inspector.style.left, left);
+  $('crop-x').blur(); editor.preview.fit();
+  assert.ok(parseFloat(inspector.style.top) + 40 <= editor.preview.geometry.top - 16 + 1e-8);
+  $('crop-controls-toggle').click(); assert.equal($('crop-fields').hidden, true);
+  $('crop-controls-toggle').click(); assert.equal($('crop-fields').hidden, false);
+});

@@ -123,19 +123,17 @@
               </div>
             </div>
           </div>
-          <details id="inspector" class="crop-inspector" open>
-            <summary>Crop</summary>
-            <div class="preference-list">
-              <div class="row"><label for="crop-ratio">Aspect Ratio</label><select id="crop-ratio"><option value="0">Free</option><option value="original">Original</option><option value="1">1:1</option><option value="1.7777777777777777">16:9</option><option value="0.5625">9:16</option><option value="1.3333333333333333">4:3</option><option value="0.75">3:4</option></select></div>
-              <div class="crop-numbers">
-                <label>X <input id="crop-x" inputmode="decimal" value="0"></label>
-                <label>Y <input id="crop-y" inputmode="decimal" value="0"></label>
-                <label>Width <input id="crop-width" inputmode="decimal" value="0"></label>
-                <label>Height <input id="crop-height" inputmode="decimal" value="0"></label>
-              </div>
+          <div id="inspector" class="crop-inspector" role="group" aria-label="Crop controls">
+            <button id="crop-controls-toggle" type="button" aria-expanded="true" aria-controls="crop-fields">Crop</button>
+            <div id="crop-fields" class="crop-strip">
+              <label>Ratio <select id="crop-ratio"><option value="0">Free</option><option value="original">Original</option><option value="1">1:1</option><option value="1.7777777777777777">16:9</option><option value="0.5625">9:16</option><option value="1.3333333333333333">4:3</option><option value="0.75">3:4</option></select></label>
+              <label>X <input id="crop-x" inputmode="decimal" value="0"></label>
+              <label>Y <input id="crop-y" inputmode="decimal" value="0"></label>
+              <label title="Width">W <input id="crop-width" aria-label="Crop width" inputmode="decimal" value="0"></label>
+              <label title="Height">H <input id="crop-height" aria-label="Crop height" inputmode="decimal" value="0"></label>
+              <button id="reset-crop" type="button">Reset</button>
             </div>
-            <div class="inspector-actions"><button id="reset-crop" type="button">Reset Crop</button></div>
-          </details>
+          </div>
           </div>
           <div id="preview-unavailable" hidden>
             <p class="description">This browser cannot play this source format. Create a compatible preview to edit visually. Export uses the original video.</p>

@@ -109,8 +109,9 @@ export function moveSegment(ranges, index, delta, duration) {
   const shift = clamp(delta, min, max);
   return { start: segment.start + shift, end: segment.end + shift };
 }
-export function previewGeometry(source, viewportWidth, viewportHeight, scale = null, center = null) {
-  const fit = Math.min(Math.max(1, viewportWidth - 40) / source.width, Math.max(1, viewportHeight - 40) / source.height);
+export function previewGeometry(source, viewportWidth, viewportHeight, scale = null, center = null, controlsHeight = 0) {
+  const marginY = controlsHeight ? Math.max(20, controlsHeight + 24) : 20;
+  const fit = Math.min(Math.max(1, viewportWidth - 40) / source.width, Math.max(1, viewportHeight - 2 * marginY) / source.height);
   scale = scale === null ? fit : clamp(scale, fit, Math.max(fit, 64));
   center ||= { x: source.width / 2, y: source.height / 2 };
   // Keep the video centered on axes that fit. On enlarged axes, allow panning
@@ -123,6 +124,15 @@ export function previewGeometry(source, viewportWidth, viewportHeight, scale = n
   };
   return { scale, fitScale: fit, center, width: source.width * scale, height: source.height * scale,
     left: viewportWidth / 2 - center.x * scale, top: viewportHeight / 2 - center.y * scale };
+}
+export function cropControlsPosition(geometry, crop, viewport, controls, fitted) {
+  const anchorX = geometry.left + crop.x * geometry.scale;
+  // At fit, use the source edge so controls never cover even the discarded area.
+  const anchorY = fitted ? geometry.top : geometry.top + crop.y * geometry.scale;
+  return {
+    left: clamp(anchorX, 8, Math.max(8, viewport.width - controls.width - 8)),
+    top: clamp(anchorY - controls.height - 16, 8, Math.max(8, viewport.height - controls.height - 8))
+  };
 }
 export function zoomPreviewAt(geometry, anchor, viewport, nextScale) {
   const x = (anchor.x - geometry.left) / geometry.scale;

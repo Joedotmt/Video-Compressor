@@ -391,12 +391,13 @@ export class VideoEditor {
     };
     const mobile = document.defaultView?.matchMedia?.('(max-width: 760px)');
     if (mobile) {
-      const updateInspector = () => { $('inspector').open = !mobile.matches; };
+      const updateInspector = () => this.preview.setInspectorOpen(!mobile.matches);
       updateInspector(); mobile.addEventListener('change', updateInspector);
     }
     if (globalThis.ResizeObserver) {
       this.resizeObserver = new ResizeObserver(() => this.refreshView());
       this.resizeObserver.observe($('preview-viewport'));
+      this.resizeObserver.observe($('inspector'));
       this.resizeObserver.observe($('timeline-scroll'));
     }
 

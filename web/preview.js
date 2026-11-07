@@ -1,4 +1,4 @@
-import { clamp, previewGeometry, zoomPreviewAt } from './edits.js';
+import { clamp, previewGeometry, zoomPreviewAt, cropControlsPosition } from './edits.js';
 const $ = id => document.getElementById(id);
 
 // A source-coordinate camera. Crop edits and camera movement are independent.
@@ -21,10 +21,28 @@ export class PreviewView {
     this.viewport.classList.toggle('hand-tool', tool === 'hand');
   }
   dimensions() { return { width: this.viewport.clientWidth, height: this.viewport.clientHeight }; }
+  setInspectorOpen(open) {
+    $('crop-fields').hidden = !open;
+    $('crop-controls-toggle').setAttribute('aria-expanded', String(open));
+    this.render();
+  }
+  positionInspector() {
+    if (!this.geometry || this.editor.cropDragging) return;
+    const inspector = $('inspector'), view = this.dimensions();
+    const controls = { width: inspector.offsetWidth || Math.min(560, view.width - 16), height: inspector.offsetHeight || 40 };
+    const position = cropControlsPosition(this.geometry, this.editor.crop, view, controls, this.scale === null);
+    // Don't move an input away from the pointer while its value is being edited.
+    if (inspector.contains(document.activeElement) && inspector.style.left) {
+      position.left = clamp(parseFloat(inspector.style.left), 8, Math.max(8, view.width - controls.width - 8));
+      if (this.scale !== null) position.top = clamp(parseFloat(inspector.style.top), 8, Math.max(8, view.height - controls.height - 8));
+    }
+    inspector.style.left = `${position.left}px`; inspector.style.top = `${position.top}px`;
+  }
   render() {
     const source = this.editor.source, view = this.dimensions();
     if (!source || !view.width || !view.height) return;
-    this.geometry = previewGeometry(source, view.width, view.height, this.scale, this.center);
+    const controlsHeight = Math.max(40, $('inspector').offsetHeight);
+    this.geometry = previewGeometry(source, view.width, view.height, this.scale, this.center, controlsHeight);
     if (this.geometry.scale <= this.geometry.fitScale * (1 + 1e-9)) {
       this.scale = null; this.center = null;
     } else {
@@ -32,6 +50,7 @@ export class PreviewView {
     }
     this.editor.previewZoom = this.geometry.scale;
     for (const key of ['width', 'height', 'left', 'top']) $('video-stage').style[key] = `${this.geometry[key]}px`;
+    this.positionInspector();
     if (document.activeElement !== $('preview-zoom')) $('preview-zoom').value = Number((this.geometry.scale * 100).toFixed(2));
     $('preview-zoom').min = Number((this.geometry.fitScale * 100).toFixed(2));
     $('preview-zoom').max = Math.max(6400, this.geometry.fitScale * 100);
@@ -104,6 +123,8 @@ export class PreviewView {
     this.viewport.classList.remove('panning');
   }
   bind() {
+    $('crop-controls-toggle').onclick = () => this.setInspectorOpen($('crop-fields').hidden);
+    $('inspector').addEventListener('focusout', () => queueMicrotask(() => this.positionInspector()));
     $('preview-crop-tool').onclick = () => { this.setTool('crop'); this.viewport.focus({ preventScroll: true }); };
     $('preview-hand-tool').onclick = () => { this.setTool('hand'); this.viewport.focus({ preventScroll: true }); };
     $('preview-fit').onclick = () => this.fit();
