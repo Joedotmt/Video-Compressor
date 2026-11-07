@@ -1,0 +1,21 @@
+{
+  "name": "joemt-video-compressor",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/prepare-engine.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/prepare-engine.mjs && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/web/*.test.mjs"
+  },
+  "dependencies": {
+    "@ffmpeg/core": "0.12.10",
+    "@ffmpeg/core-mt": "0.12.10",
+    "@ffmpeg/ffmpeg": "0.12.15"
+  },
+  "devDependencies": {
+    "vite": "6.4.5",
+    "web-worker": "1.5.0"
+  }
+}

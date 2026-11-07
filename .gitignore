@@ -22,3 +22,9 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# Browser build
+node_modules/
+public/engine/
+public/av1/
+public/engine-mt/

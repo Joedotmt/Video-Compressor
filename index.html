@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Joemt Video Compressor</title>
+  <link rel="icon" href="./data/icons/io.github.Joedotmt.JoemtVideoCompressor.svg">
+  <link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+  <header class="app-header"><h1>Joemt Video Compressor</h1></header>
+  <main>
+    <input id="file" type="file" accept="video/*,.mkv,.avi,.mov,.m4v,.mts,.m2ts,.ts,.webm" hidden>
+    <section id="empty-state">
+      <p>Open a video or drop one here.</p>
+      <button id="dropzone" type="button" disabled>Open Video…</button>
+    </section>
+
+    <div id="editor" hidden>
+      <section aria-labelledby="input-heading">
+        <div class="section-heading"><h2 id="input-heading">Input Video</h2></div>
+        <div class="preference-list">
+        <div class="row">
+          <div class="source-info">
+            <strong id="filename"></strong>
+            <p id="source-summary" class="description"></p>
+          </div>
+          <button id="replace" type="button">Choose Another Video…</button>
+        </div>
+        </div>
+      </section>
+
+      <form id="settings" novalidate>
+        <fieldset id="controls" disabled>
+          <section aria-labelledby="output-heading">
+            <div class="section-heading">
+              <h2 id="output-heading">Output</h2>
+              <button id="reset-target" type="button" title="Use Source Size">Reset</button>
+            </div>
+            <p class="description group-description">Choose the approximate size of the compressed file.</p>
+            <div class="preference-list">
+            <div class="row">
+              <label for="target">Target Size</label>
+              <div class="value"><input id="target" value="25" inputmode="decimal"><span>MB</span></div>
+            </div>
+            <div class="row property-row"><span>Estimated Video Bitrate</span><output id="bitrate">—</output></div>
+            </div>
+          </section>
+
+          <section aria-labelledby="video-heading">
+            <div class="section-heading">
+              <h2 id="video-heading">Video</h2>
+              <button id="reset-video" type="button" title="Use Source Video Settings">Reset</button>
+            </div>
+            <div class="preference-list">
+            <div class="row"><label for="width">Width</label><div class="value"><input id="width" value="1920" inputmode="decimal"><span>px</span></div></div>
+            <div class="row"><label for="height">Height</label><div class="value"><input id="height" value="1080" inputmode="decimal"><span>px</span></div></div>
+            <div class="row"><label for="fps">Frame Rate</label><div class="value"><input id="fps" value="30" inputmode="decimal"><span>fps</span></div></div>
+            <div class="row property-row"><span>Output Video</span><output id="output-summary">—</output></div>
+            </div>
+          </section>
+
+          <section aria-labelledby="audio-heading">
+            <div class="section-heading">
+              <h2 id="audio-heading">Audio</h2>
+              <button id="reset-audio" type="button" title="Use Source Audio Bitrate">Reset</button>
+            </div>
+            <div class="preference-list">
+            <div class="row">
+              <div><label for="audio">Audio</label><p id="audio-hint" class="description">Include audio in the compressed video</p></div>
+              <input id="audio" type="checkbox" checked aria-describedby="audio-hint">
+            </div>
+            <div class="row"><label for="audioKbps">Audio Bitrate</label><div class="value"><input id="audioKbps" value="128" inputmode="decimal"><span>kbps</span></div></div>
+            </div>
+          </section>
+
+          <details class="advanced">
+            <summary><span>Advanced Options<span class="description">Codec, encoding speed, tuning, and playback speed</span></span></summary>
+            <div class="advanced-content">
+            <div class="row"><label for="codec">Codec</label><select id="codec"><option value="libx264">H.264 (Compatibility)</option><option value="libx265">H.265 (Smaller files)</option><option value="libaom-av1">AV1 (Smallest files)</option></select></div>
+            <div class="row"><label for="preset">Encoding Preset</label><select id="preset"></select></div>
+            <div class="row"><label for="tune">Tune For</label><select id="tune"></select></div>
+            <div class="row"><label for="speed">Playback Speed</label><div class="value"><input id="speed" value="1" inputmode="decimal"><span>×</span></div></div>
+            <p id="codec-hint" class="description"></p>
+            </div>
+          </details>
+
+          <div class="preference-list"><div class="row save-row"><label for="output-name">Save As</label><input id="output-name" value="video_compressed.mp4" maxlength="180"></div></div>
+        </fieldset>
+        <p id="validation" class="error" role="alert"></p>
+      </form>
+    </div>
+
+    <div class="bottom-bar">
+      <div id="activity" hidden>
+        <p id="activity-title">Preparing…</p>
+        <progress id="progress" max="100" value="0"></progress>
+        <p id="status" class="description" role="status" aria-live="polite"></p>
+      </div>
+      <div class="actions">
+        <button id="cancel" type="button" hidden>Cancel</button>
+        <button id="compress" type="submit" form="settings" disabled hidden>Compress</button>
+      </div>
+      <div id="result" hidden>
+        <p>Compression complete.</p>
+        <p id="result-summary" class="description"></p>
+        <a id="download" download>Download Video</a>
+      </div>
+      <p id="message" role="status" aria-live="polite"></p>
+      <details id="diagnostics" hidden><summary>Processing Details</summary><pre id="logs"></pre></details>
+    </div>
+  </main>
+  <script type="module" src="/web/app.js"></script>
+</body>
+</html>
