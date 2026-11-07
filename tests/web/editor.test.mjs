@@ -140,7 +140,7 @@ test('clicking the track or selecting a segment does not seek; inspector edits a
   document.querySelector('[aria-label="Select segment 1"]').click();
   assert.equal(editor.playhead, 5); assert.equal($('segment-in').value, '00:00:02.000');
   assert.equal($('segment-out').value, '00:00:04.000'); assert.equal($('segment-duration').textContent, '00:00:02.000');
-  assert.ok($('segment-in').closest('.crop-inspector')); assert.ok($('trim-mode').closest('.crop-inspector'));
+  assert.ok($('segment-in').closest('.timeline-footer')); assert.ok($('trim-mode').closest('.timeline-footer'));
   $('segment-out').value = '1'; $('segment-out').dispatchEvent(new dom.window.Event('change'));
   assert.throws(() => editor.getEdits(), /highlighted/);
   $('segment-out').value = '3.5'; $('segment-out').dispatchEvent(new dom.window.Event('change'));
@@ -164,7 +164,7 @@ test('dragging the playhead scrubs zoomed timelines and clamps outside the sourc
   key('End', handle); assert.equal(editor.playhead, 10);
 });
 test('Space-drag pans without playing or changing crop; a Space tap plays', () => {
-  reset(); editor.preview.render(); const view = $('preview-viewport'); view.setPointerCapture = () => {};
+  reset(); editor.preview.zoom(2); const view = $('preview-viewport'); view.setPointerCapture = () => {};
   const before = editor.getEdits(), scale = editor.preview.geometry.scale;
   const event = (x, y) => ({ button: 0, pointerId: 1, clientX: x, clientY: y, preventDefault() {}, stopPropagation() {} });
   let plays = 0; const original = editor.play; editor.play = () => { plays++; };
@@ -188,6 +188,8 @@ test('a second touch switches from crop dragging to pinch/pan without moving the
   editor.preview.move(touch(1, 100, 220)); editor.preview.move(touch(2, 500, 220));
   assert.ok(Math.abs(editor.preview.scale - initial * 2) < 1e-8);
   assert.deepEqual(editor.getEdits(), before);
+  editor.preview.move(touch(1, 490, 220));
+  assert.equal(editor.preview.scale, null); assert.equal(editor.preview.center, null);
   editor.preview.end(touch(2, 500, 220)); editor.preview.end(touch(1, 100, 220));
   assert.equal(editor.preview.gesture, null); assert.equal(editor.preview.points.size, 0);
   editor.dispose();
@@ -282,4 +284,35 @@ test('navigator ends zoom around the opposite edge, body pans, and fit restores 
   key('Home', $('timeline-window-pan')); assert.equal($('timeline-scroll').scrollLeft, 0);
   bar.dispatchEvent(new dom.window.Event('dblclick')); assert.equal(editor.timelineZoom, 1);
   assert.deepEqual(editor.getEdits(), before); assert.equal($('timeline-zoom'), null);
+});
+
+test('all zoom-out controls restore a centered fit after zooming and panning', () => {
+  reset(); const preview = editor.preview, view = $('preview-viewport');
+  const before = editor.getEdits();
+  const displaced = () => { preview.zoom(4); preview.center = { x: -10000, y: 10000 }; preview.render(); };
+  const centered = () => {
+    assert.equal(preview.scale, null); assert.equal(preview.center, null);
+    assert.ok(Math.abs(preview.geometry.left + preview.geometry.width / 2 - view.clientWidth / 2) < 1e-8);
+    assert.ok(Math.abs(preview.geometry.top + preview.geometry.height / 2 - view.clientHeight / 2) < 1e-8);
+    assert.equal($('preview-zoom-out').disabled, true);
+    assert.deepEqual(editor.getEdits(), before);
+  };
+  displaced();
+  for (let i = 0; i < 30; i++) view.dispatchEvent(new dom.window.WheelEvent('wheel', { deltaY: 100, clientX: 10, clientY: 10, bubbles: true, cancelable: true }));
+  centered();
+  displaced(); for (let i = 0; i < 30; i++) $('preview-zoom-out').click(); centered();
+  displaced(); $('preview-zoom').value = '1'; $('preview-zoom').dispatchEvent(new dom.window.Event('change')); centered();
+  assert.ok(Number($('preview-zoom').value) > 1);
+});
+test('crop overlay controls remain editable without triggering preview pan or zoom', () => {
+  reset(); editor.preview.zoom(2); editor.preview.setTool('hand');
+  assert.equal($('inspector').parentElement, $('preview-viewport'));
+  const before = { ...editor.preview.geometry };
+  editor.preview.begin({ target: $('crop-width'), button: 0, pointerId: 1, clientX: 300, clientY: 100 });
+  assert.equal(editor.preview.gesture, null);
+  const wheel = new dom.window.WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true });
+  $('crop-width').dispatchEvent(wheel);
+  assert.equal(wheel.defaultPrevented, false); assert.deepEqual(editor.preview.geometry, before);
+  $('crop-width').value = '320'; $('crop-width').dispatchEvent(new dom.window.Event('input'));
+  assert.equal(editor.getEdits().crop.width, 320);
 });

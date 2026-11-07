@@ -81,7 +81,7 @@ test('preview fit respects portrait and landscape bounds; zoom anchors the sourc
     const fit = previewGeometry(source, 640, 480);
     assert.ok(fit.left >= 20 && fit.top >= 20);
     assert.ok(fit.left + fit.width <= 620 && fit.top + fit.height <= 460);
-    const cursor = { x: 150, y: 300 };
+    const cursor = { x: fit.left + fit.width * .35, y: fit.top + fit.height * .6 };
     const center = zoomPreviewAt(fit, cursor, { width: 640, height: 480 }, 4);
     const zoom = previewGeometry(source, 640, 480, 4, center);
     assert.ok(Math.abs((cursor.x - fit.left) / fit.scale - (cursor.x - zoom.left) / zoom.scale) < 1e-8);
@@ -105,4 +105,18 @@ test('unpaired points remain available for later marks; coincident Out/In points
   assert.deepEqual(segmentsFromPoints(points, 250).map(({ start, end }) => [start, end]), [[0, 50], [100, 150]]);
   const split = [{ id: 1, type: 'in', time: 0 }, { id: 2, type: 'out', time: 100 }, { id: 3, type: 'in', time: 100 }];
   assert.deepEqual(segmentsFromPoints(split, 250).map(({ start, end }) => [start, end]), [[0, 100], [100, 250]]);
+});
+
+test('preview pan stays within video edges and zooming below fit centers every aspect ratio', () => {
+  for (const source of [{ width: 1920, height: 1080 }, { width: 1080, height: 1920 }, { width: 640, height: 480 }]) {
+    for (const center of [{ x: -10000, y: 10000 }, { x: 10000, y: -10000 }]) {
+      const zoom = previewGeometry(source, 640, 480, 4, center);
+      assert.ok(zoom.left <= 20 + 1e-8 && zoom.left + zoom.width >= 620 - 1e-8);
+      assert.ok(zoom.top <= 20 + 1e-8 && zoom.top + zoom.height >= 460 - 1e-8);
+      const fit = previewGeometry(source, 640, 480, .001, center);
+      assert.equal(fit.scale, fit.fitScale);
+      assert.ok(Math.abs(fit.left + fit.width / 2 - 320) < 1e-8);
+      assert.ok(Math.abs(fit.top + fit.height / 2 - 240) < 1e-8);
+    }
+  }
 });

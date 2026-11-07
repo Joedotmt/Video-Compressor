@@ -25,13 +25,21 @@ export class PreviewView {
     const source = this.editor.source, view = this.dimensions();
     if (!source || !view.width || !view.height) return;
     this.geometry = previewGeometry(source, view.width, view.height, this.scale, this.center);
+    if (this.geometry.scale <= this.geometry.fitScale * (1 + 1e-9)) {
+      this.scale = null; this.center = null;
+    } else {
+      this.scale = this.geometry.scale; this.center = this.geometry.center;
+    }
     this.editor.previewZoom = this.geometry.scale;
     for (const key of ['width', 'height', 'left', 'top']) $('video-stage').style[key] = `${this.geometry[key]}px`;
     if (document.activeElement !== $('preview-zoom')) $('preview-zoom').value = Number((this.geometry.scale * 100).toFixed(2));
+    $('preview-zoom').min = Number((this.geometry.fitScale * 100).toFixed(2));
+    $('preview-zoom').max = Math.max(6400, this.geometry.fitScale * 100);
+    $('preview-zoom-out').disabled = this.scale === null;
     $('preview-fit').setAttribute('aria-pressed', this.scale === null);
   }
   fit() {
-    if (this.editor.busy) return;
+    if (this.editor.busy || this.editor.cropDragging) return;
     this.scale = null; this.center = null; this.render();
   }
   zoom(scale, anchor = null) {
@@ -40,7 +48,8 @@ export class PreviewView {
     if (!this.geometry) return;
     const view = this.dimensions();
     anchor ||= { x: view.width / 2, y: view.height / 2 };
-    scale = clamp(scale, .01, 64);
+    if (scale <= this.geometry.fitScale) { this.fit(); return; }
+    scale = Math.min(scale, Math.max(64, this.geometry.fitScale));
     this.center = zoomPreviewAt(this.geometry, anchor, view, scale);
     this.scale = scale; this.render();
   }
@@ -49,6 +58,7 @@ export class PreviewView {
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
   begin(event) {
+    if (event.target?.closest('.crop-inspector')) return;
     if (this.editor.busy || !this.editor.source || ![0, 1].includes(event.button)) return;
     this.render(); if (!this.geometry) return;
     const point = this.relative(event);
@@ -82,7 +92,7 @@ export class PreviewView {
         y: gesture.center.y - (point.y - gesture.point.y) / gesture.scale };
     } else if (gesture.kind === 'pinch' && this.points.size === 2) {
       const [a, b] = [...this.points.values()], view = this.dimensions();
-      this.scale = clamp(gesture.scale * Math.hypot(a.x - b.x, a.y - b.y) / gesture.distance, .01, 64);
+      this.scale = clamp(gesture.scale * Math.hypot(a.x - b.x, a.y - b.y) / gesture.distance, this.geometry.fitScale, Math.max(64, this.geometry.fitScale));
       this.center = { x: gesture.source.x - ((a.x + b.x) / 2 - view.width / 2) / this.scale,
         y: gesture.source.y - ((a.y + b.y) / 2 - view.height / 2) / this.scale };
     } else return;
@@ -101,10 +111,13 @@ export class PreviewView {
     $('preview-zoom-out').onclick = () => this.zoom((this.geometry?.scale || 1) / 1.25);
     $('preview-zoom').onchange = () => {
       const value = Number($('preview-zoom').value);
-      if (!Number.isFinite(value) || value < 1 || value > 6400) { this.editor.error('Preview zoom must be between 1% and 6400%.'); return; }
+      const maximum = Number($('preview-zoom').max);
+      if (!Number.isFinite(value) || value <= 0 || value > maximum) { this.editor.error(`Enter a positive preview zoom up to ${maximum}%.`); return; }
       this.zoom(value / 100); this.editor.error('');
+      if (this.geometry) $('preview-zoom').value = Number((this.geometry.scale * 100).toFixed(2));
     };
     this.viewport.addEventListener('wheel', event => {
+      if (event.target.closest('.crop-inspector')) return;
       if (this.editor.busy || this.editor.cropDragging) return;
       event.preventDefault();
       this.zoom((this.geometry?.scale || 1) * Math.exp(-clamp(event.deltaY, -100, 100) * .003), this.relative(event));

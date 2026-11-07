@@ -74,8 +74,8 @@ and **Export** button share the application header.
   O at 30 produces 10–30. An opposite point between the marks separates them:
   I after an Out or O before an In still creates another segment.
 - Select a segment to edit its exact In/Out timecodes or delete it in the
-  inspector. Dragging a boundary uses your initial grab offset and does not
-  move the playhead. The inspector also contains the **Keep/Remove** setting
+  timeline footer. Dragging a boundary uses your initial grab offset and does not
+  move the playhead. The footer also contains the **Keep/Remove** setting
   for all marked segments and the kept-segments preview option. No points means
   the whole video. Segments export in source order, with overlaps merged.
 - **B** splits a segment; **Delete** deletes the selected segment. **Space** plays
@@ -96,14 +96,16 @@ and **Export** button share the application header.
   left of zero; panning cannot expose negative time.
 - The preview has independent zoom and pan: wheel to zoom around the pointer,
   **Space-drag**, middle-drag, or **Hand (H)** to pan, and **Z** to fit the whole
-  video. **Crop (V)** returns to editing the rectangle. Enter a magnification
-  between 1% and 6400%, or use the +/− buttons. Changing the crop never moves
+  video. **Crop (V)** returns to editing the rectangle. The minimum zoom fits
+  and centers the whole video; zooming out with the wheel, buttons, numeric
+  field, or pinch always returns there. Panning stops at the video edges.
+  Zoom up to 6400% with the numeric field or +/− buttons. Changing the crop never moves
   the view, and changing the view never affects exported pixels.
 - On mobile, pinch to zoom and pan the preview, use Hand for one-finger panning,
   and drag the timeline scrollbar ends to zoom. Drag the playhead or use the
-  seek slider to scrub. The inspector collapses below the timeline on narrow
-  screens. Desktop editing fills the window, with scrolling confined to the
-  inspector or status area when necessary.
+  seek slider to scrub. Crop controls sit in a collapsible overlay at the
+  top right of the preview, initially collapsed on mobile. Desktop editing
+  fills the window, with scrolling confined to controls or status when necessary.
 - Output dimensions follow the crop until you manually edit the resize settings.
   Video Reset uses the current crop dimensions. The target-size budget uses the
   total kept duration, adjusted for playback speed.

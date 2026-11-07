@@ -111,9 +111,17 @@ export function moveSegment(ranges, index, delta, duration) {
 }
 export function previewGeometry(source, viewportWidth, viewportHeight, scale = null, center = null) {
   const fit = Math.min(Math.max(1, viewportWidth - 40) / source.width, Math.max(1, viewportHeight - 40) / source.height);
-  scale = scale === null ? fit : clamp(scale, .01, 64);
+  scale = scale === null ? fit : clamp(scale, fit, Math.max(fit, 64));
   center ||= { x: source.width / 2, y: source.height / 2 };
-  return { scale, width: source.width * scale, height: source.height * scale,
+  // Keep the video centered on axes that fit. On enlarged axes, allow panning
+  // to either edge with a small margin, but never into empty space beyond it.
+  const limitX = Math.max(0, (source.width - Math.max(1, viewportWidth - 40) / scale) / 2);
+  const limitY = Math.max(0, (source.height - Math.max(1, viewportHeight - 40) / scale) / 2);
+  center = {
+    x: clamp(center.x, source.width / 2 - limitX, source.width / 2 + limitX),
+    y: clamp(center.y, source.height / 2 - limitY, source.height / 2 + limitY)
+  };
+  return { scale, fitScale: fit, center, width: source.width * scale, height: source.height * scale,
     left: viewportWidth / 2 - center.x * scale, top: viewportHeight / 2 - center.y * scale };
 }
 export function zoomPreviewAt(geometry, anchor, viewport, nextScale) {

@@ -123,6 +123,19 @@
               </div>
             </div>
           </div>
+          <details id="inspector" class="crop-inspector" open>
+            <summary>Crop</summary>
+            <div class="preference-list">
+              <div class="row"><label for="crop-ratio">Aspect Ratio</label><select id="crop-ratio"><option value="0">Free</option><option value="original">Original</option><option value="1">1:1</option><option value="1.7777777777777777">16:9</option><option value="0.5625">9:16</option><option value="1.3333333333333333">4:3</option><option value="0.75">3:4</option></select></div>
+              <div class="crop-numbers">
+                <label>X <input id="crop-x" inputmode="decimal" value="0"></label>
+                <label>Y <input id="crop-y" inputmode="decimal" value="0"></label>
+                <label>Width <input id="crop-width" inputmode="decimal" value="0"></label>
+                <label>Height <input id="crop-height" inputmode="decimal" value="0"></label>
+              </div>
+            </div>
+            <div class="inspector-actions"><button id="reset-crop" type="button">Reset Crop</button></div>
+          </details>
           </div>
           <div id="preview-unavailable" hidden>
             <p class="description">This browser cannot play this source format. Create a compatible preview to edit visually. Export uses the original video.</p>
@@ -136,35 +149,7 @@
             <span id="video-duration" class="description"></span>
           </div>
           </section>
-          <details id="inspector" class="crop-inspector" open>
-            <summary>Inspector</summary>
-            <div class="section-heading"><h2 id="crop-heading">Crop</h2><button id="reset-crop" type="button">Reset</button></div>
-            <div class="preference-list">
-              <div class="row"><label for="crop-ratio">Aspect Ratio</label><select id="crop-ratio"><option value="0">Free</option><option value="original">Original</option><option value="1">1:1</option><option value="1.7777777777777777">16:9</option><option value="0.5625">9:16</option><option value="1.3333333333333333">4:3</option><option value="0.75">3:4</option></select></div>
-              <div class="crop-numbers">
-                <label>X <input id="crop-x" inputmode="decimal" value="0"></label>
-                <label>Y <input id="crop-y" inputmode="decimal" value="0"></label>
-                <label>Width <input id="crop-width" inputmode="decimal" value="0"></label>
-                <label>Height <input id="crop-height" inputmode="decimal" value="0"></label>
-              </div>
-            </div>
-            <section id="segment-inspector" aria-labelledby="segment-heading">
-              <div class="section-heading"><h2 id="segment-heading">Segment</h2><button id="delete-segment" type="button" disabled>Delete</button></div>
-              <p id="segment-empty" class="description">Select a segment.</p>
-              <div id="segment-fields" hidden>
-                <label>In <input id="segment-in" value="00:00:00.000" aria-label="Selected segment In"></label>
-                <label>Out <input id="segment-out" value="00:00:00.000" aria-label="Selected segment Out"></label>
-                <div class="segment-duration"><span>Duration</span><output id="segment-duration"></output></div>
-              </div>
-              <div id="point-fields" hidden>
-                <label><span id="point-label">Point</span><input id="point-time" aria-label="Selected point time"></label>
-              </div>
-            </section>
-            <section class="trim-settings" aria-label="Trim settings">
-              <div class="row"><label for="trim-mode">Marked Segments</label><select id="trim-mode"><option value="keep">Keep</option><option value="remove">Remove</option></select></div>
-                <label class="preview-selection"><input id="preview-kept" type="checkbox"> Preview kept segments only</label>
-            </section>
-          </details>
+
           <section class="timeline-panel" aria-label="Timeline editor">
           <div class="timeline-lane">
           <div class="timeline-gutter" aria-hidden="true"><span>Video</span></div>
@@ -191,13 +176,33 @@
 
           <section class="timeline-footer" aria-labelledby="trim-heading">
             <h2 id="trim-heading" class="visually-hidden">Trim</h2>
+            <div class="timeline-edit-controls">
             <div class="trim-toolbar">
               <button id="mark-in" type="button">Set In (I)</button>
               <button id="mark-out" type="button">Set Out (O)</button>
               <button id="split-segment" type="button" title="Split at playhead (B)">Split</button><button id="reset-trim" type="button">Reset</button>
             </div>
+            <section id="segment-inspector" aria-labelledby="segment-heading">
+              <div class="section-heading"><h2 id="segment-heading">Segment</h2></div><button id="delete-segment" type="button" disabled>Delete</button>
+              <p id="segment-empty" class="description">Select a segment.</p>
+              <div id="segment-fields" hidden>
+                <label>In <input id="segment-in" value="00:00:00.000" aria-label="Selected segment In"></label>
+                <label>Out <input id="segment-out" value="00:00:00.000" aria-label="Selected segment Out"></label>
+                <div class="segment-duration"><span>Duration</span><output id="segment-duration"></output></div>
+              </div>
+              <div id="point-fields" hidden>
+                <label><span id="point-label">Point</span><input id="point-time" aria-label="Selected point time"></label>
+              </div>
+            </section>
+            </div>
+            <div class="timeline-options">
+            <section class="trim-settings" aria-label="Trim settings">
+              <div class="row"><label for="trim-mode">Marked Segments</label><select id="trim-mode"><option value="keep">Keep</option><option value="remove">Remove</option></select></div>
+                <label class="preview-selection"><input id="preview-kept" type="checkbox"> Preview kept segments only</label>
+            </section>
             <p id="trim-summary" class="description" aria-live="polite">No cuts. The full video will be kept.</p>
             <details class="shortcut-help"><summary>Keyboard Shortcuts</summary><p class="description">Drag a segment to move it · Middle-drag: Pan timeline · Drag scrollbar ends: Zoom · I: Add In point · O: Add Out point · =/−: Timeline zoom · \: Fit timeline · B: Split · Delete: Remove selected segment · Z: Fit video · H/V: Hand/Crop tool · Space: Play/Pause (hold and drag to pan) · ←/→: Seek 1 second · ,/.: Step by nominal frame duration. Shortcuts are active in this tab outside text fields. Times accept seconds or HH:MM:SS.mmm.</p></details>
+            </div>
           </section>
 
           </section>
