@@ -32,7 +32,7 @@ export class VideoEditor {
     this.error('');
   }
   dispose() {
-    this.video.pause(); this.video.removeAttribute('src'); this.video.load();
+    this.video.pause(); this.updatePlayback(false); this.video.removeAttribute('src'); this.video.load();
     if (this.url) URL.revokeObjectURL(this.url);
     this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishCropDrag?.();
     this.url = null; this.source = null; this.preview?.reset(); this.spaceHeld = false; $('preview-viewport').classList.remove('space-pan');
@@ -63,6 +63,11 @@ export class VideoEditor {
     $('timeline-playhead').style.left = `${this.source ? this.timeX(this.playhead) : 0}px`;
     $('playhead-handle').setAttribute('aria-valuenow', this.playhead);
     $('playhead-handle').setAttribute('aria-valuetext', timecode(this.playhead));
+  }
+  updatePlayback(playing) {
+    const button = $('play'), label = playing ? 'Pause' : 'Play';
+    button.dataset.playing = String(playing);
+    button.setAttribute('aria-label', label); button.title = `${label} (Space)`;
   }
   async play() {
     if (this.video.paused) {
@@ -285,6 +290,7 @@ export class VideoEditor {
     box.style.left = `${this.crop.x / this.source.width * 100}%`; box.style.top = `${this.crop.y / this.source.height * 100}%`;
     box.style.width = `${this.crop.width / this.source.width * 100}%`; box.style.height = `${this.crop.height / this.source.height * 100}%`;
     if (!this.cropDragging) this.renderPreview();
+    else this.preview.positionInspector();
   }
   drag(event) {
     if (this.busy || event.button !== 0) return;
@@ -389,11 +395,6 @@ export class VideoEditor {
       event.preventDefault(); event.stopPropagation();
       this.position(event.key === 'Home' ? 0 : event.key === 'End' ? this.source.duration : this.playhead + (event.key === 'ArrowLeft' ? -1 : 1) / this.source.fps);
     };
-    const mobile = document.defaultView?.matchMedia?.('(max-width: 760px)');
-    if (mobile) {
-      const updateInspector = () => this.preview.setInspectorOpen(!mobile.matches);
-      updateInspector(); mobile.addEventListener('change', updateInspector);
-    }
     if (globalThis.ResizeObserver) {
       this.resizeObserver = new ResizeObserver(() => this.refreshView());
       this.resizeObserver.observe($('preview-viewport'));
@@ -404,8 +405,9 @@ export class VideoEditor {
     $('make-preview').onclick = onPreview;
     this.video.addEventListener('error', () => { if (this.url) $('preview-unavailable').hidden = false; });
     this.video.addEventListener('loadedmetadata', () => this.position(this.playhead));
-    this.video.addEventListener('play', () => { $('play').textContent = 'Pause'; });
-    this.video.addEventListener('pause', () => { $('play').textContent = 'Play'; });
+    this.video.addEventListener('play', () => this.updatePlayback(true));
+    this.video.addEventListener('pause', () => this.updatePlayback(false));
+    this.video.addEventListener('ended', () => this.updatePlayback(false));
     this.video.addEventListener('timeupdate', () => {
       this.playhead = this.video.currentTime; this.updateTime();
       if (!this.video.paused && $('preview-kept').checked) {

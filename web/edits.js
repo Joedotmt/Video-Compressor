@@ -125,10 +125,10 @@ export function previewGeometry(source, viewportWidth, viewportHeight, scale = n
   return { scale, fitScale: fit, center, width: source.width * scale, height: source.height * scale,
     left: viewportWidth / 2 - center.x * scale, top: viewportHeight / 2 - center.y * scale };
 }
-export function cropControlsPosition(geometry, crop, viewport, controls, fitted) {
+export function cropControlsPosition(geometry, crop, viewport, controls) {
   const anchorX = geometry.left + crop.x * geometry.scale;
-  // At fit, use the source edge so controls never cover even the discarded area.
-  const anchorY = fitted ? geometry.top : geometry.top + crop.y * geometry.scale;
+  // Use one crop-relative anchor at every zoom level, including during a drag.
+  const anchorY = geometry.top + crop.y * geometry.scale;
   return {
     left: clamp(anchorX, 8, Math.max(8, viewport.width - controls.width - 8)),
     top: clamp(anchorY - controls.height - 16, 8, Math.max(8, viewport.height - controls.height - 8))

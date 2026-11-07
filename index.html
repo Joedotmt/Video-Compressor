@@ -1,232 +1,645 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Joemt Video Compressor</title>
-  <link rel="icon" href="./data/icons/io.github.Joedotmt.JoemtVideoCompressor.svg">
-  <link rel="stylesheet" href="/web/style.css">
-</head>
-<body>
-  <header class="app-header">
-    <h1>Joemt Video Compressor</h1>
-    <nav class="tabs" role="tablist" aria-label="Video tools">
-      <button id="compression-tab" role="tab" aria-selected="true" aria-controls="compression-panel" type="button">Compression</button>
-      <button id="edit-tab" role="tab" aria-selected="false" aria-controls="edit-panel" tabindex="-1" type="button" disabled>Trim &amp; Crop</button>
-    </nav>
-    <div id="source-info" class="source-info" hidden><strong id="filename"></strong><p id="source-summary" class="description"></p></div>
-    <div class="header-actions">
-      <button id="replace" type="button" title="Choose another video (Ctrl+O)" disabled>Choose Video…</button>
-      <button id="cancel" type="button" hidden>Cancel</button>
-      <button id="compress" type="submit" form="settings" disabled hidden>Export</button>
-    </div>
-  </header>
-  <main>
-    <input id="file" type="file" accept="video/*,.mkv,.avi,.mov,.m4v,.mts,.m2ts,.ts,.webm" hidden>
-    <section id="empty-state">
-      <p>Open a video or drop one here.</p>
-      <button id="dropzone" type="button" disabled>Open Video…</button>
-    </section>
-
-    <div id="editor" hidden>
-      <div id="compression-panel" role="tabpanel" aria-labelledby="compression-tab">
-      <form id="settings" novalidate>
-        <fieldset id="controls" disabled>
-          <section aria-labelledby="output-heading">
-            <div class="section-heading">
-              <h2 id="output-heading">Output</h2>
-              <button id="reset-target" type="button" title="Use Source Size">Reset</button>
-            </div>
-            <p class="description group-description">Choose the approximate size of the compressed file.</p>
-            <div class="preference-list">
-            <div class="row">
-              <label for="target">Target Size</label>
-              <div class="value"><input id="target" value="25" inputmode="decimal"><span>MB</span></div>
-            </div>
-            <div class="row property-row"><span>Estimated Video Bitrate</span><output id="bitrate">—</output></div>
-            </div>
-          </section>
-
-          <section aria-labelledby="video-heading">
-            <div class="section-heading">
-              <h2 id="video-heading">Video</h2>
-              <button id="reset-video" type="button" title="Use Source Video Settings">Reset</button>
-            </div>
-            <div class="preference-list">
-            <div class="row"><label for="width">Width</label><div class="value"><input id="width" value="1920" inputmode="decimal"><span>px</span></div></div>
-            <div class="row"><label for="height">Height</label><div class="value"><input id="height" value="1080" inputmode="decimal"><span>px</span></div></div>
-            <div class="row"><label for="fps">Frame Rate</label><div class="value"><input id="fps" value="30" inputmode="decimal"><span>fps</span></div></div>
-            <div class="row property-row"><span>Output Video</span><output id="output-summary">—</output></div>
-            </div>
-          </section>
-
-          <section aria-labelledby="audio-heading">
-            <div class="section-heading">
-              <h2 id="audio-heading">Audio</h2>
-              <button id="reset-audio" type="button" title="Use Source Audio Bitrate">Reset</button>
-            </div>
-            <div class="preference-list">
-            <div class="row">
-              <div><label for="audio">Audio</label><p id="audio-hint" class="description">Include audio in the compressed video</p></div>
-              <input id="audio" type="checkbox" checked aria-describedby="audio-hint">
-            </div>
-            <div class="row"><label for="audioKbps">Audio Bitrate</label><div class="value"><input id="audioKbps" value="128" inputmode="decimal"><span>kbps</span></div></div>
-            </div>
-          </section>
-
-          <details class="advanced">
-            <summary><span>Advanced Options<span class="description">Codec, encoding speed, tuning, and playback speed</span></span></summary>
-            <div class="advanced-content">
-            <div class="row"><label for="codec">Codec</label><select id="codec"><option value="libx264">H.264 (Compatibility)</option><option value="libx265">H.265 (Smaller files)</option><option value="libaom-av1">AV1 (Smallest files)</option></select></div>
-            <div class="row"><label for="preset">Encoding Preset</label><select id="preset"></select></div>
-            <div class="row"><label for="tune">Tune For</label><select id="tune"></select></div>
-            <div class="row"><label for="speed">Playback Speed</label><div class="value"><input id="speed" value="1" inputmode="decimal"><span>×</span></div></div>
-            <p id="codec-hint" class="description"></p>
-            </div>
-          </details>
-
-          <div class="preference-list"><div class="row save-row"><label for="output-name">Save As</label><input id="output-name" value="video_compressed.mp4" maxlength="180"></div></div>
-        </fieldset>
-      </form>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Joemt Video Compressor</title>
+    <link
+      rel="icon"
+      href="./data/icons/io.github.Joedotmt.JoemtVideoCompressor.svg"
+    />
+    <link rel="stylesheet" href="/web/style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Joemt Video Compressor</h1>
+      <nav class="tabs" role="tablist" aria-label="Video tools">
+        <button
+          id="compression-tab"
+          role="tab"
+          aria-selected="true"
+          aria-controls="compression-panel"
+          type="button"
+        >
+          Compression
+        </button>
+        <button
+          id="edit-tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="edit-panel"
+          tabindex="-1"
+          type="button"
+          disabled
+        >
+          Trim &amp; Crop
+        </button>
+      </nav>
+      <div id="source-info" class="source-info" hidden>
+        <strong id="filename"></strong>
+        <p id="source-summary" class="description"></p>
       </div>
-      <section id="edit-panel" role="tabpanel" aria-labelledby="edit-tab" hidden>
-        <fieldset id="edit-controls" disabled>
-          <section class="monitor-panel" aria-label="Source monitor">
-            <div class="monitor-toolbar">
-              <div class="view-tools" role="group" aria-label="Preview tool">
-                <button id="preview-crop-tool" type="button" aria-pressed="true" title="Edit crop (V)">Crop</button>
-                <button id="preview-hand-tool" type="button" aria-pressed="false" title="Pan view (H)">Hand</button>
-              </div>
-              <div class="magnification">
-                <button id="preview-zoom-out" type="button" aria-label="Zoom preview out">−</button>
-                <label><input id="preview-zoom" type="number" min="1" max="6400" step="any" value="100" aria-label="Preview zoom percent">%</label>
-                <button id="preview-zoom-in" type="button" aria-label="Zoom preview in">+</button>
-                <button id="preview-fit" type="button" title="Fit video (Z)">Fit <kbd>Z</kbd></button>
-              </div>
-            </div>
-          <div id="preview-viewport" class="preview-area" tabindex="0" aria-label="Video preview. Wheel to zoom, Space-drag to pan, Z to fit.">
-            <div id="preview-canvas">
-            <div id="video-stage">
-              <video id="edit-video" playsinline preload="metadata"></video>
-              <div id="crop-overlay">
-                <div id="crop-box" tabindex="0" role="group" aria-label="Crop rectangle. Use arrow keys to move; Shift for 10 pixels.">
-                  <span class="crop-grid" aria-hidden="true"></span>
-                  <button class="crop-handle nw" data-handle="nw" type="button" aria-label="Resize crop from top left"></button>
-                  <button class="crop-handle n" data-handle="n" type="button" aria-label="Resize crop from top"></button>
-                  <button class="crop-handle ne" data-handle="ne" type="button" aria-label="Resize crop from top right"></button>
-                  <button class="crop-handle e" data-handle="e" type="button" aria-label="Resize crop from right"></button>
-                  <button class="crop-handle se" data-handle="se" type="button" aria-label="Resize crop from bottom right"></button>
-                  <button class="crop-handle s" data-handle="s" type="button" aria-label="Resize crop from bottom"></button>
-                  <button class="crop-handle sw" data-handle="sw" type="button" aria-label="Resize crop from bottom left"></button>
-                  <button class="crop-handle w" data-handle="w" type="button" aria-label="Resize crop from left"></button>
+      <div id="header-options" class="header-options"></div>
+      <div class="header-actions">
+        <button
+          id="replace"
+          type="button"
+          title="Choose another video (Ctrl+O)"
+          disabled
+        >
+          Choose Video…
+        </button>
+        <button id="cancel" type="button" hidden>Cancel</button>
+        <button id="compress" type="submit" form="settings" disabled hidden>
+          Export
+        </button>
+      </div>
+    </header>
+    <main>
+      <input
+        id="file"
+        type="file"
+        accept="video/*,.mkv,.avi,.mov,.m4v,.mts,.m2ts,.ts,.webm"
+        hidden
+      />
+      <section id="empty-state">
+        <p>Open a video or drop one here.</p>
+        <button id="dropzone" type="button" disabled>Open Video…</button>
+      </section>
+
+      <div id="editor" hidden>
+        <div
+          id="compression-panel"
+          role="tabpanel"
+          aria-labelledby="compression-tab"
+        >
+          <form id="settings" novalidate>
+            <fieldset id="controls" disabled>
+              <section aria-labelledby="output-heading">
+                <div class="section-heading">
+                  <h2 id="output-heading">Output</h2>
+                  <button
+                    id="reset-target"
+                    type="button"
+                    title="Use Source Size"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <p class="description group-description">
+                  Choose the approximate size of the compressed file.
+                </p>
+                <div class="preference-list">
+                  <div class="row">
+                    <label for="target">Target Size</label>
+                    <div class="value">
+                      <input id="target" value="25" inputmode="decimal" /><span
+                        >MB</span
+                      >
+                    </div>
+                  </div>
+                  <div class="row property-row">
+                    <span>Estimated Video Bitrate</span
+                    ><output id="bitrate">—</output>
+                  </div>
+                </div>
+              </section>
+
+              <section aria-labelledby="video-heading">
+                <div class="section-heading">
+                  <h2 id="video-heading">Video</h2>
+                  <button
+                    id="reset-video"
+                    type="button"
+                    title="Use Source Video Settings"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div class="preference-list">
+                  <div class="row">
+                    <label for="width">Width</label>
+                    <div class="value">
+                      <input id="width" value="1920" inputmode="decimal" /><span
+                        >px</span
+                      >
+                    </div>
+                  </div>
+                  <div class="row">
+                    <label for="height">Height</label>
+                    <div class="value">
+                      <input
+                        id="height"
+                        value="1080"
+                        inputmode="decimal"
+                      /><span>px</span>
+                    </div>
+                  </div>
+                  <div class="row">
+                    <label for="fps">Frame Rate</label>
+                    <div class="value">
+                      <input id="fps" value="30" inputmode="decimal" /><span
+                        >fps</span
+                      >
+                    </div>
+                  </div>
+                  <div class="row property-row">
+                    <span>Output Video</span
+                    ><output id="output-summary">—</output>
+                  </div>
+                </div>
+              </section>
+
+              <section aria-labelledby="audio-heading">
+                <div class="section-heading">
+                  <h2 id="audio-heading">Audio</h2>
+                  <button
+                    id="reset-audio"
+                    type="button"
+                    title="Use Source Audio Bitrate"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div class="preference-list">
+                  <div class="row">
+                    <div>
+                      <label for="audio">Audio</label>
+                      <p id="audio-hint" class="description">
+                        Include audio in the compressed video
+                      </p>
+                    </div>
+                    <input
+                      id="audio"
+                      type="checkbox"
+                      checked
+                      aria-describedby="audio-hint"
+                    />
+                  </div>
+                  <div class="row">
+                    <label for="audioKbps">Audio Bitrate</label>
+                    <div class="value">
+                      <input
+                        id="audioKbps"
+                        value="128"
+                        inputmode="decimal"
+                      /><span>kbps</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <details class="advanced">
+                <summary>
+                  <span
+                    >Advanced Options<span class="description"
+                      >Codec, encoding speed, tuning, and playback speed</span
+                    ></span
+                  >
+                </summary>
+                <div class="advanced-content">
+                  <div class="row">
+                    <label for="codec">Codec</label
+                    ><select id="codec">
+                      <option value="libx264">H.264 (Compatibility)</option>
+                      <option value="libx265">H.265 (Smaller files)</option>
+                      <option value="libaom-av1">AV1 (Smallest files)</option>
+                    </select>
+                  </div>
+                  <div class="row">
+                    <label for="preset">Encoding Preset</label
+                    ><select id="preset"></select>
+                  </div>
+                  <div class="row">
+                    <label for="tune">Tune For</label
+                    ><select id="tune"></select>
+                  </div>
+                  <div class="row">
+                    <label for="speed">Playback Speed</label>
+                    <div class="value">
+                      <input id="speed" value="1" inputmode="decimal" /><span
+                        >×</span
+                      >
+                    </div>
+                  </div>
+                  <p id="codec-hint" class="description"></p>
+                </div>
+              </details>
+
+              <div class="preference-list">
+                <div class="row save-row">
+                  <label for="output-name">Save As</label
+                  ><input
+                    id="output-name"
+                    value="video_compressed.mp4"
+                    maxlength="180"
+                  />
                 </div>
               </div>
-            </div>
-          </div>
-          <div id="inspector" class="crop-inspector" role="group" aria-label="Crop controls">
-            <button id="crop-controls-toggle" type="button" aria-expanded="true" aria-controls="crop-fields">Crop</button>
-            <div id="crop-fields" class="crop-strip">
-              <label>Ratio <select id="crop-ratio"><option value="0">Free</option><option value="original">Original</option><option value="1">1:1</option><option value="1.7777777777777777">16:9</option><option value="0.5625">9:16</option><option value="1.3333333333333333">4:3</option><option value="0.75">3:4</option></select></label>
-              <label>X <input id="crop-x" inputmode="decimal" value="0"></label>
-              <label>Y <input id="crop-y" inputmode="decimal" value="0"></label>
-              <label title="Width">W <input id="crop-width" aria-label="Crop width" inputmode="decimal" value="0"></label>
-              <label title="Height">H <input id="crop-height" aria-label="Crop height" inputmode="decimal" value="0"></label>
-              <button id="reset-crop" type="button">Reset</button>
-            </div>
-          </div>
-          </div>
-          <div id="preview-unavailable" hidden>
-            <p class="description">This browser cannot play this source format. Create a compatible preview to edit visually. Export uses the original video.</p>
-            <button id="make-preview" type="button">Create Compatible Preview</button>
-          </div>
-          <div class="transport">
-            <button id="play" type="button">Play</button>
-            <button id="step-back" type="button" title="Previous frame (comma)">−1 frame</button>
-            <button id="step-forward" type="button" title="Next frame (period)">+1 frame</button>
-            <label class="time-jump">Position <input id="playhead-time" value="00:00:00.000" aria-label="Playhead time"></label>
-            <span id="video-duration" class="description"></span>
-          </div>
-          </section>
-
-          <section class="timeline-panel" aria-label="Timeline editor">
-          <div class="timeline-lane">
-          <div class="timeline-gutter" aria-hidden="true"><span>Video</span></div>
-          <div id="timeline-scroll" tabindex="0" role="group" aria-label="Timeline. Equals and minus to zoom; backslash to fit. Scroll to pan.">
-            <div id="timeline-content">
-              <div id="timeline-ruler" aria-label="Time ruler"></div>
-              <div id="timeline" aria-label="Marked video segments">
-                <div id="source-clip"></div>
-                <div id="timeline-segments"></div>
-                <div id="timeline-points"></div>
+            </fieldset>
+          </form>
+          <div id="compression-options" class="compression-options"></div>
+        </div>
+        <section
+          id="edit-panel"
+          role="tabpanel"
+          aria-labelledby="edit-tab"
+          hidden
+        >
+          <fieldset id="edit-controls" disabled>
+            <section class="monitor-panel" aria-label="Source monitor">
+              <div class="monitor-toolbar">
+                <div class="view-tools" role="group" aria-label="Preview tool">
+                  <button
+                    id="preview-crop-tool"
+                    type="button"
+                    aria-pressed="true"
+                    title="Edit crop (V)"
+                  >
+                    Crop
+                  </button>
+                  <button
+                    id="preview-hand-tool"
+                    type="button"
+                    aria-pressed="false"
+                    title="Pan view (H)"
+                  >
+                    Hand
+                  </button>
+                </div>
+                <div class="magnification">
+                  <button
+                    id="preview-zoom-out"
+                    type="button"
+                    aria-label="Zoom preview out"
+                  >
+                    −
+                  </button>
+                  <label
+                    ><input
+                      id="preview-zoom"
+                      type="number"
+                      min="1"
+                      max="6400"
+                      step="any"
+                      value="100"
+                      aria-label="Preview zoom percent"
+                    />%</label
+                  >
+                  <button
+                    id="preview-zoom-in"
+                    type="button"
+                    aria-label="Zoom preview in"
+                  >
+                    +
+                  </button>
+                  <button id="preview-fit" type="button" title="Fit video (Z)">
+                    Fit <kbd>Z</kbd>
+                  </button>
+                </div>
               </div>
-              <div id="timeline-playhead"><button id="playhead-handle" type="button" role="slider" aria-label="Playhead" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0"></button></div>
-              <input id="seek" type="range" min="0" max="1" step="0.001" value="0" aria-label="Seek video">
-            </div>
-          </div>
-          </div>
-          <div class="timeline-navigator" id="timeline-navigator" aria-label="Timeline navigation" title="Drag to pan; drag either end to zoom. Double-click to fit.">
-            <div id="timeline-thumb">
-              <button id="timeline-window-start" class="navigator-edge start" type="button" role="slider" aria-label="Visible timeline start" aria-orientation="horizontal"></button>
-              <button id="timeline-window-pan" type="button" role="scrollbar" aria-label="Pan timeline" aria-controls="timeline-content" aria-orientation="horizontal"></button>
-              <button id="timeline-window-end" class="navigator-edge end" type="button" role="slider" aria-label="Visible timeline end" aria-orientation="horizontal"></button>
-            </div>
-          </div>
-
-          <section class="timeline-footer" aria-labelledby="trim-heading">
-            <h2 id="trim-heading" class="visually-hidden">Trim</h2>
-            <div class="timeline-edit-controls">
-            <div class="trim-toolbar">
-              <button id="mark-in" type="button">Set In (I)</button>
-              <button id="mark-out" type="button">Set Out (O)</button>
-              <button id="split-segment" type="button" title="Split at playhead (B)">Split</button><button id="reset-trim" type="button">Reset</button>
-            </div>
-            <section id="segment-inspector" aria-labelledby="segment-heading">
-              <div class="section-heading"><h2 id="segment-heading">Segment</h2></div><button id="delete-segment" type="button" disabled>Delete</button>
-              <p id="segment-empty" class="description">Select a segment.</p>
-              <div id="segment-fields" hidden>
-                <label>In <input id="segment-in" value="00:00:00.000" aria-label="Selected segment In"></label>
-                <label>Out <input id="segment-out" value="00:00:00.000" aria-label="Selected segment Out"></label>
-                <div class="segment-duration"><span>Duration</span><output id="segment-duration"></output></div>
+              <div
+                id="preview-viewport"
+                class="preview-area"
+                tabindex="0"
+                aria-label="Video preview. Wheel to zoom, Space-drag to pan, Z to fit."
+              >
+                <div id="preview-canvas">
+                  <div id="video-stage">
+                    <video
+                      id="edit-video"
+                      playsinline
+                      preload="metadata"
+                    ></video>
+                    <div id="crop-overlay">
+                      <div
+                        id="crop-box"
+                        tabindex="0"
+                        role="group"
+                        aria-label="Crop rectangle. Use arrow keys to move; Shift for 10 pixels."
+                      >
+                        <span class="crop-grid" aria-hidden="true"></span>
+                        <button
+                          class="crop-handle nw"
+                          data-handle="nw"
+                          type="button"
+                          aria-label="Resize crop from top left"
+                        ></button>
+                        <button
+                          class="crop-handle n"
+                          data-handle="n"
+                          type="button"
+                          aria-label="Resize crop from top"
+                        ></button>
+                        <button
+                          class="crop-handle ne"
+                          data-handle="ne"
+                          type="button"
+                          aria-label="Resize crop from top right"
+                        ></button>
+                        <button
+                          class="crop-handle e"
+                          data-handle="e"
+                          type="button"
+                          aria-label="Resize crop from right"
+                        ></button>
+                        <button
+                          class="crop-handle se"
+                          data-handle="se"
+                          type="button"
+                          aria-label="Resize crop from bottom right"
+                        ></button>
+                        <button
+                          class="crop-handle s"
+                          data-handle="s"
+                          type="button"
+                          aria-label="Resize crop from bottom"
+                        ></button>
+                        <button
+                          class="crop-handle sw"
+                          data-handle="sw"
+                          type="button"
+                          aria-label="Resize crop from bottom left"
+                        ></button>
+                        <button
+                          class="crop-handle w"
+                          data-handle="w"
+                          type="button"
+                          aria-label="Resize crop from left"
+                        ></button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div
+                  id="inspector"
+                  class="crop-inspector"
+                  role="group"
+                  aria-label="Crop controls"
+                >
+                  <div id="crop-fields" class="crop-strip">
+                    <label
+                      >X <input id="crop-x" inputmode="decimal" value="0"
+                    /></label>
+                    <label
+                      >Y <input id="crop-y" inputmode="decimal" value="0"
+                    /></label>
+                    <label title="Width"
+                      >W
+                      <input
+                        id="crop-width"
+                        aria-label="Crop width"
+                        inputmode="decimal"
+                        value="0"
+                    /></label>
+                    <label title="Height"
+                      >H
+                      <input
+                        id="crop-height"
+                        aria-label="Crop height"
+                        inputmode="decimal"
+                        value="0"
+                    /></label>
+                    <label
+                      ><select id="crop-ratio">
+                        <option value="0">Free</option>
+                        <option value="original">Original</option>
+                        <option value="1">1:1</option>
+                        <option value="1.7777777777777777">16:9</option>
+                        <option value="0.5625">9:16</option>
+                        <option value="1.3333333333333333">4:3</option>
+                        <option value="0.75">3:4</option>
+                      </select></label
+                    >
+                    <button id="reset-crop" type="button">Reset</button>
+                  </div>
+                </div>
               </div>
-              <div id="point-fields" hidden>
-                <label><span id="point-label">Point</span><input id="point-time" aria-label="Selected point time"></label>
+              <div id="preview-unavailable" hidden>
+                <p class="description">
+                  This browser cannot play this source format. Create a
+                  compatible preview to edit visually. Export uses the original
+                  video.
+                </p>
+                <button id="make-preview" type="button">
+                  Create Compatible Preview
+                </button>
+              </div>
+              <div class="transport">
+                <div class="time-jump">
+                  <input id="playhead-time" value="00:00:00.000" aria-label="Playhead time" title="Playhead time" spellcheck="false" />
+                </div>
+                <div class="transport-buttons" role="group" aria-label="Playback controls">
+                  <button id="step-back" class="icon-button" type="button" aria-label="Previous frame" title="Previous frame (comma)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 5h2v14H5z M18 5v14L8 12z" /></svg>
+                  </button>
+                  <button id="play" class="icon-button" type="button" aria-label="Play" title="Play (Space)" data-playing="false">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="play-glyph" d="M8 5l11 7-11 7z" /><path class="pause-glyph" d="M6 5h4v14H6z M14 5h4v14h-4z" /></svg>
+                  </button>
+                  <button id="step-forward" class="icon-button" type="button" aria-label="Next frame" title="Next frame (period)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17 5h2v14h-2z M6 5l10 7-10 7z" /></svg>
+                  </button>
+                </div>
+                <span id="video-duration" class="description"></span>
               </div>
             </section>
-            </div>
-            <div class="timeline-options">
-            <section class="trim-settings" aria-label="Trim settings">
-              <div class="row"><label for="trim-mode">Marked Segments</label><select id="trim-mode"><option value="keep">Keep</option><option value="remove">Remove</option></select></div>
-                <label class="preview-selection"><input id="preview-kept" type="checkbox"> Preview kept segments only</label>
+
+            <section class="timeline-panel" aria-label="Timeline editor">
+              <div class="timeline-lane">
+                <div class="timeline-gutter" aria-hidden="true">
+                  <span>Video</span>
+                </div>
+                <div
+                  id="timeline-scroll"
+                  tabindex="0"
+                  role="group"
+                  aria-label="Timeline. Equals and minus to zoom; backslash to fit. Scroll to pan."
+                >
+                  <div id="timeline-content">
+                    <div id="timeline-ruler" aria-label="Time ruler"></div>
+                    <div id="timeline" aria-label="Marked video segments">
+                      <div id="source-clip"></div>
+                      <div id="timeline-segments"></div>
+                      <div id="timeline-points"></div>
+                    </div>
+                    <div id="timeline-playhead">
+                      <button
+                        id="playhead-handle"
+                        type="button"
+                        role="slider"
+                        aria-label="Playhead"
+                        aria-valuemin="0"
+                        aria-valuemax="1"
+                        aria-valuenow="0"
+                      ></button>
+                    </div>
+                    <input
+                      id="seek"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.001"
+                      value="0"
+                      aria-label="Seek video"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div
+                class="timeline-navigator"
+                id="timeline-navigator"
+                aria-label="Timeline navigation"
+                title="Drag to pan; drag either end to zoom. Double-click to fit."
+              >
+                <div id="timeline-thumb">
+                  <button
+                    id="timeline-window-start"
+                    class="navigator-edge start"
+                    type="button"
+                    role="slider"
+                    aria-label="Visible timeline start"
+                    aria-orientation="horizontal"
+                  ></button>
+                  <button
+                    id="timeline-window-pan"
+                    type="button"
+                    role="scrollbar"
+                    aria-label="Pan timeline"
+                    aria-controls="timeline-content"
+                    aria-orientation="horizontal"
+                  ></button>
+                  <button
+                    id="timeline-window-end"
+                    class="navigator-edge end"
+                    type="button"
+                    role="slider"
+                    aria-label="Visible timeline end"
+                    aria-orientation="horizontal"
+                  ></button>
+                </div>
+              </div>
+
+              <section class="timeline-footer" aria-labelledby="trim-heading">
+                <h2 id="trim-heading" class="visually-hidden">Trim</h2>
+                <div class="timeline-edit-controls">
+                  <div class="trim-toolbar">
+                    <button id="mark-in" type="button">Set In (I)</button>
+                    <button id="mark-out" type="button">Set Out (O)</button>
+                    <button
+                      id="split-segment"
+                      type="button"
+                      title="Split at playhead (B)"
+                    >
+                      Split</button
+                    ><button id="reset-trim" type="button">Reset</button>
+                  </div>
+                  <section
+                    id="segment-inspector"
+                    aria-labelledby="segment-heading"
+                  >
+                    <div class="section-heading">
+                      <h2 id="segment-heading">Segment</h2>
+                    </div>
+                    <button id="delete-segment" type="button" disabled>
+                      Delete
+                    </button>
+                    <p id="segment-empty" class="description">
+                      Select a segment.
+                    </p>
+                    <div id="segment-fields" hidden>
+                      <label
+                        >In
+                        <input
+                          id="segment-in"
+                          value="00:00:00.000"
+                          aria-label="Selected segment In"
+                      /></label>
+                      <label
+                        >Out
+                        <input
+                          id="segment-out"
+                          value="00:00:00.000"
+                          aria-label="Selected segment Out"
+                      /></label>
+                      <div class="segment-duration">
+                        <span>Duration</span
+                        ><output id="segment-duration"></output>
+                      </div>
+                    </div>
+                    <div id="point-fields" hidden>
+                      <label
+                        ><span id="point-label">Point</span
+                        ><input
+                          id="point-time"
+                          aria-label="Selected point time"
+                      /></label>
+                    </div>
+                  </section>
+                </div>
+                <div class="timeline-options">
+                  <section class="trim-settings" aria-label="Trim settings">
+                    <div class="row">
+                      <label for="trim-mode">Marked Segments</label
+                      ><select id="trim-mode">
+                        <option value="keep">Keep</option>
+                        <option value="remove">Remove</option>
+                      </select>
+                    </div>
+                    <label class="preview-selection"
+                      ><input id="preview-kept" type="checkbox" /> Preview kept
+                      segments only</label
+                    >
+                  </section>
+                  <p id="trim-summary" class="description" aria-live="polite">
+                    No cuts. The full video will be kept.
+                  </p>
+                  <details id="diagnostics" hidden>
+                    <summary>Processing Details</summary>
+                    <pre id="logs"></pre>
+                  </details>
+                  <details class="shortcut-help">
+                    <summary>Keyboard Shortcuts</summary>
+                    <p class="description">
+                      Drag a segment to move it · Middle-drag: Pan timeline ·
+                      Drag scrollbar ends: Zoom · I: Add In point · O: Add Out
+                      point · =/−: Timeline zoom · \: Fit timeline · B: Split ·
+                      Delete: Remove selected segment · Z: Fit video · H/V:
+                      Hand/Crop tool · Space: Play/Pause (hold and drag to pan)
+                      · ←/→: Seek 1 second · ,/.: Step by nominal frame
+                      duration. Shortcuts are active in this tab outside text
+                      fields. Times accept seconds or HH:MM:SS.mmm.
+                    </p>
+                  </details>
+                </div>
+              </section>
             </section>
-            <p id="trim-summary" class="description" aria-live="polite">No cuts. The full video will be kept.</p>
-            <details class="shortcut-help"><summary>Keyboard Shortcuts</summary><p class="description">Drag a segment to move it · Middle-drag: Pan timeline · Drag scrollbar ends: Zoom · I: Add In point · O: Add Out point · =/−: Timeline zoom · \: Fit timeline · B: Split · Delete: Remove selected segment · Z: Fit video · H/V: Hand/Crop tool · Space: Play/Pause (hold and drag to pan) · ←/→: Seek 1 second · ,/.: Step by nominal frame duration. Shortcuts are active in this tab outside text fields. Times accept seconds or HH:MM:SS.mmm.</p></details>
-            </div>
-          </section>
-
-          </section>
-
-        </fieldset>
-        <p id="edit-error" class="error" role="alert"></p>
-      </section>
-      <p id="edit-summary" class="description" hidden></p>
-    </div>
-
-    <div class="bottom-bar">
-      <p id="validation" class="error" role="alert"></p>
-      <div id="activity" hidden>
-        <p id="activity-title">Preparing…</p>
-        <progress id="progress" max="100" value="0"></progress>
-        <p id="status" class="description" role="status" aria-live="polite"></p>
+          </fieldset>
+          <p id="edit-error" class="error" role="alert"></p>
+        </section>
+        <p id="edit-summary" class="description" hidden></p>
       </div>
-      <div id="result" hidden>
-        <p>Export complete.</p>
-        <p id="result-summary" class="description"></p>
-        <a id="download" download>Download Video</a>
+
+      <div class="bottom-bar">
+        <p id="validation" class="error" role="alert"></p>
+        <div id="activity" hidden>
+          <p id="activity-title">Preparing…</p>
+          <progress id="progress" max="100" value="0"></progress>
+          <p
+            id="status"
+            class="description"
+            role="status"
+            aria-live="polite"
+          ></p>
+        </div>
+        <div id="result" hidden>
+          <p>Export complete.</p>
+          <p id="result-summary" class="description"></p>
+          <a id="download" download>Download Video</a>
+        </div>
+        <p id="message" role="status" aria-live="polite"></p>
+
       </div>
-      <p id="message" role="status" aria-live="polite"></p>
-      <details id="diagnostics" hidden><summary>Processing Details</summary><pre id="logs"></pre></details>
-    </div>
-  </main>
-  <script type="module" src="/web/app.js"></script>
-</body>
+    </main>
+    <script type="module" src="/web/app.js"></script>
+  </body>
 </html>

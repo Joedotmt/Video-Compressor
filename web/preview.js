@@ -21,21 +21,11 @@ export class PreviewView {
     this.viewport.classList.toggle('hand-tool', tool === 'hand');
   }
   dimensions() { return { width: this.viewport.clientWidth, height: this.viewport.clientHeight }; }
-  setInspectorOpen(open) {
-    $('crop-fields').hidden = !open;
-    $('crop-controls-toggle').setAttribute('aria-expanded', String(open));
-    this.render();
-  }
   positionInspector() {
-    if (!this.geometry || this.editor.cropDragging) return;
+    if (!this.geometry) return;
     const inspector = $('inspector'), view = this.dimensions();
     const controls = { width: inspector.offsetWidth || Math.min(560, view.width - 16), height: inspector.offsetHeight || 40 };
-    const position = cropControlsPosition(this.geometry, this.editor.crop, view, controls, this.scale === null);
-    // Don't move an input away from the pointer while its value is being edited.
-    if (inspector.contains(document.activeElement) && inspector.style.left) {
-      position.left = clamp(parseFloat(inspector.style.left), 8, Math.max(8, view.width - controls.width - 8));
-      if (this.scale !== null) position.top = clamp(parseFloat(inspector.style.top), 8, Math.max(8, view.height - controls.height - 8));
-    }
+    const position = cropControlsPosition(this.geometry, this.editor.crop, view, controls);
     inspector.style.left = `${position.left}px`; inspector.style.top = `${position.top}px`;
   }
   render() {
@@ -123,8 +113,6 @@ export class PreviewView {
     this.viewport.classList.remove('panning');
   }
   bind() {
-    $('crop-controls-toggle').onclick = () => this.setInspectorOpen($('crop-fields').hidden);
-    $('inspector').addEventListener('focusout', () => queueMicrotask(() => this.positionInspector()));
     $('preview-crop-tool').onclick = () => { this.setTool('crop'); this.viewport.focus({ preventScroll: true }); };
     $('preview-hand-tool').onclick = () => { this.setTool('hand'); this.viewport.focus({ preventScroll: true }); };
     $('preview-fit').onclick = () => this.fit();

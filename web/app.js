@@ -38,6 +38,11 @@ function validate() {
   }
   $('compress').disabled = busy || !job;
 }
+function placeDiagnostics() {
+  const target = !source ? $('header-options') : $('edit-panel').hidden ? $('compression-options') : document.querySelector('.timeline-options');
+  const diagnostics = $('diagnostics');
+  if (diagnostics.parentElement !== target) { diagnostics.open = false; target.append(diagnostics); }
+}
 function setBusy(value) {
   busy = value; $('controls').disabled = value || !source;
   editor.setBusy(value);
@@ -48,6 +53,8 @@ function setBusy(value) {
   $('compress').hidden = !source;
   $('editor').hidden = !source; $('source-info').hidden = !source;
   $('empty-state').hidden = !!source || value;
+  placeDiagnostics();
+  if (!value && !$('edit-panel').hidden) editor.refreshView();
   validate();
 }
 function clearOutput() { if (outputURL) URL.revokeObjectURL(outputURL); outputURL = null; $('result').hidden = true; $('download').removeAttribute('href'); }
@@ -68,7 +75,6 @@ async function openFile(selected) {
   // Memory32 FFmpeg cannot address files of 2 GiB or more.
   if (selected.size >= 2 * 1024 ** 3) { message('This video exceeds the browser engine’s 2 GB file limit. Use a smaller source video.', true); return; }
   clearOutput(); message(); editor.dispose(); source = null; file = null;
-  showTab('compression');
   setBusy(true); activity('Reading video…', 'Loading the local video engine. The first download is about 32 MB.');
   const task = newRunner(); runner = task;
   try {
@@ -106,6 +112,7 @@ function showTab(name) {
     $(`${tab}-tab`).tabIndex = active ? 0 : -1;
     $(`${tab}-panel`).hidden = !active;
   }
+  placeDiagnostics();
   if (name !== 'edit') editor.video.pause();
   else editor.refreshView();
 }
@@ -160,6 +167,7 @@ $('settings').addEventListener('submit', async event => {
 });
 window.addEventListener('beforeunload', event => { if (busy) { event.preventDefault(); event.returnValue = ''; } });
 encoderOptions(); validate();
+placeDiagnostics();
 
 $('dropzone').disabled = true;
 initializeIsolation().finally(() => { initializing = false; $('dropzone').disabled = false; $('replace').disabled = false; });

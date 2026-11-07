@@ -317,22 +317,42 @@ test('crop overlay controls remain editable without triggering preview pan or zo
   assert.equal(editor.getEdits().crop.width, 320);
 });
 
-test('crop strip stays still during dragging and field editing, and clears the video at fit', () => {
+test('crop strip follows the crop continuously during dragging, typing and zooming', () => {
   reset();
   const inspector = $('inspector');
   Object.defineProperty(inspector, 'offsetWidth', { value: 300, configurable: true });
   Object.defineProperty(inspector, 'offsetHeight', { value: 40, configurable: true });
   editor.crop = { x: 200, y: 200, width: 200, height: 200 };
   editor.preview.zoom(2); editor.renderCrop();
-  const old = { left: inspector.style.left, top: inspector.style.top };
-  editor.cropDragging = true; editor.crop.x += 10; editor.renderCrop();
-  assert.deepEqual({ left: inspector.style.left, top: inspector.style.top }, old);
-  editor.cropDragging = false; editor.renderCrop();
-  assert.notEqual(inspector.style.left, old.left);
-  $('crop-x').focus(); const left = inspector.style.left;
-  editor.crop.x += 10; editor.renderCrop(); assert.equal(inspector.style.left, left);
+  const left = parseFloat(inspector.style.left), top = parseFloat(inspector.style.top);
+  editor.cropDragging = true; editor.crop.x += 10; editor.crop.y += 5; editor.renderCrop();
+  assert.equal(parseFloat(inspector.style.left), left + 20);
+  assert.equal(parseFloat(inspector.style.top), top + 10);
+  editor.cropDragging = false;
+  editor.renderCrop(); assert.equal(parseFloat(inspector.style.left), left + 20);
+  $('crop-x').focus(); $('crop-x').value = '220'; $('crop-x').dispatchEvent(new dom.window.Event('input'));
+  assert.equal(parseFloat(inspector.style.left), left + 40);
   $('crop-x').blur(); editor.preview.fit();
+  const cropTop = editor.preview.geometry.top + editor.crop.y * editor.preview.geometry.scale;
+  assert.ok(Math.abs(parseFloat(inspector.style.top) + 40 + 16 - cropTop) < 1e-8);
+  $('reset-crop').click();
   assert.ok(parseFloat(inspector.style.top) + 40 <= editor.preview.geometry.top - 16 + 1e-8);
-  $('crop-controls-toggle').click(); assert.equal($('crop-fields').hidden, true);
-  $('crop-controls-toggle').click(); assert.equal($('crop-fields').hidden, false);
+  assert.equal($('crop-controls-toggle'), null); assert.equal($('crop-fields').hidden, false);
+});
+
+test('transport icons track playback state and frame-step buttons retain their behavior', () => {
+  reset(); const play = $('play');
+  assert.ok(play.querySelector('svg')); assert.equal(play.getAttribute('aria-label'), 'Play');
+  editor.video.dispatchEvent(new dom.window.Event('play'));
+  assert.equal(play.dataset.playing, 'true'); assert.equal(play.getAttribute('aria-label'), 'Pause');
+  assert.ok(play.querySelector('.pause-glyph'));
+  editor.video.dispatchEvent(new dom.window.Event('pause'));
+  assert.equal(play.dataset.playing, 'false'); assert.equal(play.getAttribute('aria-label'), 'Play');
+  editor.video.dispatchEvent(new dom.window.Event('play')); editor.video.dispatchEvent(new dom.window.Event('ended'));
+  assert.equal(play.dataset.playing, 'false');
+  editor.position(2); $('step-forward').click(); assert.equal(editor.playhead, 2 + 1 / source.fps);
+  $('step-back').click(); assert.equal(editor.playhead, 2);
+  assert.ok($('step-forward').querySelector('svg')); assert.ok($('step-back').querySelector('svg'));
+  assert.equal(document.querySelector('.time-jump').textContent.trim(), '');
+  assert.equal($('playhead-time').getAttribute('aria-label'), 'Playhead time');
 });

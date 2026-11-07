@@ -127,10 +127,10 @@ test('fitted preview reserves clear space for the horizontal crop strip on deskt
       const controls = { width: Math.min(560, viewport.width - 16), height: 50 };
       const geometry = previewGeometry(source, viewport.width, viewport.height, null, null, controls.height);
       for (const crop of [{ x: 0, y: 0 }, { x: source.width / 2, y: source.height / 2 }]) {
-        const pos = cropControlsPosition(geometry, crop, viewport, controls, true);
+        const pos = cropControlsPosition(geometry, crop, viewport, controls);
         assert.ok(pos.top >= 8 && pos.left >= 8);
         assert.ok(pos.left + controls.width <= viewport.width - 8);
-        assert.ok(pos.top + controls.height <= geometry.top - 16 + 1e-8);
+        assert.ok(pos.top + controls.height <= geometry.top + crop.y * geometry.scale - 16 + 1e-8);
         assert.ok(Math.abs(geometry.top + geometry.height / 2 - viewport.height / 2) < 1e-8);
       }
     }
@@ -139,9 +139,9 @@ test('fitted preview reserves clear space for the horizontal crop strip on deskt
 test('zoomed crop strip follows the top-left crop corner and stays inside the viewport', () => {
   const geometry = { left: -100, top: -100, scale: 2 };
   const controls = { width: 300, height: 40 }, viewport = { width: 800, height: 600 };
-  assert.deepEqual(cropControlsPosition(geometry, { x: 200, y: 200 }, viewport, controls, false), { left: 300, top: 244 });
+  assert.deepEqual(cropControlsPosition(geometry, { x: 200, y: 200 }, viewport, controls), { left: 300, top: 244 });
   for (const crop of [{ x: -100, y: -100 }, { x: 1000, y: 1000 }]) {
-    const pos = cropControlsPosition(geometry, crop, viewport, controls, false);
+    const pos = cropControlsPosition(geometry, crop, viewport, controls);
     assert.ok(pos.left >= 8 && pos.left + controls.width <= 792);
     assert.ok(pos.top >= 8 && pos.top + controls.height <= 592);
   }

@@ -60,7 +60,9 @@ The original Python/GTK implementation remains available. See [desktop setup](do
 
 Open a video and select the **Trim & Crop** tab. Compression settings and edits
 share the same export; the original file is never modified. The tabs, video chooser,
-and **Export** button share the application header.
+and **Export** button share the application header. Choosing another video keeps
+the current tab selected. Processing Details lives in the timeline options (or
+below the compression settings on that tab), without keeping a status bar open.
 
 - Seek by clicking or dragging the timeline ruler, dragging its playhead, or
   entering an exact playhead time. Clicking the track or a segment never seeks.
@@ -103,10 +105,10 @@ and **Export** button share the application header.
   the view, and changing the view never affects exported pixels.
 - On mobile, pinch to zoom and pan the preview, use Hand for one-finger panning,
   and drag the timeline scrollbar ends to zoom. Drag the playhead or use the
-  seek slider to scrub. Crop controls form a collapsible horizontal strip,
-  initially collapsed on mobile. At fit it sits above the video without covering
-  it; when zoomed, it anchors near the crop’s top-left corner and stays within
-  the preview. The strip stays still during dragging or field editing. On narrow
+  seek slider to scrub. Crop controls form an always-visible horizontal strip above
+  the crop’s top-left corner. They follow the rectangle continuously while
+  dragging, editing coordinates, or zooming, with viewport-edge limits to keep
+  them reachable. Fitting the full frame leaves room above it for the controls. On narrow
   screens its controls scroll horizontally. Desktop editing
   fills the window, with scrolling confined to controls or status when necessary.
 - Output dimensions follow the crop until you manually edit the resize settings.
