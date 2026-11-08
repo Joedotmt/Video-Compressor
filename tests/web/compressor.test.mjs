@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { expression, metadata, plan, command, tempo } from '../../web/compressor.js';
+import { expression, metadata, plan, command, tempo, preparedJob } from '../../web/compressor.js';
 const source = { duration: 60, audio: true };
 const values = { target: '10', width: '1920/2', height: '1081/2', fps: '30', speed: '1', audioKbps: '128', audio: true, codec: 'libx264', preset: 'medium', tune: '' };
 test('safe arithmetic with precedence, unary signs and parentheses', () => {
@@ -35,4 +35,28 @@ test('probe finds video and handles missing audio bitrate/fps', () => {
   const info = metadata({ format: { duration: '4.5' }, streams: [{ codec_type: 'video', width: 320, height: 240, avg_frame_rate: '0/0', r_frame_rate: '30000/1001' }, { codec_type: 'audio' }] }, 1048576);
   assert.equal(info.sizeMB, 1); assert.equal(info.audioKbps, 128); assert.equal(info.fps, 30000 / 1001);
   assert.throws(() => metadata({ streams: [] }, 10));
+});
+test('AV1 source codec survives probing and planning; software decoder is an input option', () => {
+  const info = metadata({ format: { duration: '2' }, streams: [{ codec_type: 'video', codec_name: 'av1', width: 128, height: 96, avg_frame_rate: '12/1' }] }, 10000);
+  assert.equal(info.videoCodec, 'av1');
+  const job = plan({ ...values, width: '64', height: '48', fps: '12' }, info);
+  const args = command(job, 'source.webm');
+  assert.equal(job.inputCodec, 'av1');
+  assert.equal(args[args.indexOf('-c:v') + 1], 'libaom-av1');
+  assert.ok(args.indexOf('-c:v') < args.indexOf('-i'));
+  assert.equal(args[args.lastIndexOf('-c:v') + 1], 'libx264');
+});
+test('AV1 bridge applies edits once and keeps final encoder settings and bitrate', () => {
+  const job = plan({ ...values, speed: '2' }, { ...source, width: 1920, height: 1080, videoCodec: 'av1' }, { segments: [{ start: 1, end: 5 }], crop: { x: 11, y: 13, width: 100, height: 80 } });
+  const bridge = command(job, 'source.webm', 'decoded.mkv', { intermediate: true });
+  assert.equal(bridge[bridge.lastIndexOf('-c:v') + 1], 'ffv1');
+  assert.equal(bridge[bridge.indexOf('-c:a') + 1], 'pcm_f32le');
+  assert.match(bridge[bridge.indexOf('-filter_complex') + 1], /trim=start=1:end=5/);
+  assert.ok(!bridge.includes('-b:v'));
+  const prepared = preparedJob(job), final = command(prepared, 'decoded.mkv');
+  assert.equal(prepared.speed, 1); assert.equal(prepared.crop, undefined); assert.equal(prepared.segments, undefined);
+  assert.equal(prepared.videoBps, job.videoBps); assert.equal(prepared.audioBps, job.audioBps);
+  assert.equal(prepared.duration, 2); assert.equal(prepared.codec, job.codec);
+  assert.ok(!final.includes('libaom-av1')); assert.ok(!final.includes('-filter_complex'));
+  assert.equal(final[final.indexOf('-vf') + 1], 'scale=960:540,setpts=(PTS-STARTPTS)/1,fps=30');
 });

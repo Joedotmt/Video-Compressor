@@ -71,6 +71,16 @@ export class VideoEditor {
     button.dataset.playing = String(playing);
     button.setAttribute('aria-label', label); button.title = `${label} (Space)`;
   }
+  updateVolume() {
+    const muted = this.video.muted || this.video.volume === 0;
+    const percent = muted ? 0 : Math.round(this.video.volume * 100);
+    if (this.video.volume > 0) this.audibleVolume = this.video.volume;
+    $('preview-volume').value = percent;
+    $('preview-volume-value').value = `${percent}%`;
+    $('preview-volume-toggle').dataset.muted = String(muted);
+    $('preview-volume-toggle').title = `Playback volume: ${percent}%`;
+    $('preview-mute').textContent = muted ? 'Unmute' : 'Mute';
+  }
   stopPlaybackClock() { this.cancelPlaybackClock?.(); this.cancelPlaybackClock = null; }
   startPlaybackClock() {
     this.stopPlaybackClock();
@@ -490,6 +500,19 @@ export class VideoEditor {
       if (!this.cancelPlaybackClock || this.video.paused) this.syncPlayback(this.video.currentTime);
     });
     $('play').onclick = () => this.play();
+    $('preview-volume').oninput = () => {
+      this.video.volume = clamp(Number($('preview-volume').value) / 100, 0, 1);
+      this.video.muted = false; this.updateVolume();
+    };
+    $('preview-mute').onclick = () => {
+      if (this.video.muted || this.video.volume === 0) {
+        if (this.video.volume === 0) this.video.volume = this.audibleVolume || 1;
+        this.video.muted = false;
+      } else this.video.muted = true;
+      this.updateVolume();
+    };
+    this.video.addEventListener('volumechange', () => this.updateVolume());
+    this.updateVolume();
     $('step-back').onclick = () => this.stepFrame(-1);
     $('step-forward').onclick = () => this.stepFrame(1);
     $('seek').oninput = () => this.position(Number($('seek').value));
@@ -531,25 +554,29 @@ export class VideoEditor {
       this.crop = dragCrop(this.crop, event.target.dataset.handle || 'move', event.key === 'ArrowLeft' ? -delta : event.key === 'ArrowRight' ? delta : 0, event.key === 'ArrowUp' ? -delta : event.key === 'ArrowDown' ? delta : 0, this.source, this.ratio());
       this.renderCrop(); this.notify();
     };
+    // Capture Space before a focused button/checkbox can activate its default
+    // action. Enter remains available for activating those controls.
+    document.addEventListener('keydown', event => {
+      if (event.key !== ' ' || this.busy || !this.source || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+      if (event.target.closest('input:not([type="range"]):not([type="checkbox"]), select, textarea, [contenteditable="true"], [contenteditable=""], [contenteditable="plaintext-only"]')) return;
+      event.preventDefault(); event.stopPropagation();
+      if (!event.repeat && !this.spaceHeld) {
+        this.spaceHeld = true; this.spaceUsed = false;
+        if (!$('edit-panel').hidden) $('preview-viewport').classList.add('space-pan');
+      }
+    }, true);
     document.addEventListener('keydown', event => {
       if ($('edit-panel').hidden || this.busy || !this.source || event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input:not([type="range"]):not([type="checkbox"]), select, textarea, [contenteditable="true"]')) return;
       const key = event.key.toLowerCase();
-      // Keep ordinary button/summary activation on Space and Enter.
-      if (key === ' ' && event.target.closest('button:not(.crop-handle), summary, input[type="checkbox"]')) return;
-      if (key === ' ') {
-        event.preventDefault();
-        if (!event.repeat) { this.spaceHeld = true; this.spaceUsed = false; $('preview-viewport').classList.add('space-pan'); }
-        return;
-      }
       if (event.target.matches('input[type="range"]') && ['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(key)) return;
       const actions = { i: () => this.markIn(), o: () => this.markOut(), '=': () => this.zoomTimeline(this.timelineZoom * 2), '+': () => this.zoomTimeline(this.timelineZoom * 2), '-': () => this.zoomTimeline(this.timelineZoom / 2), '\\': () => this.zoomTimeline(1, this.source.duration / 2), b: () => this.split(), z: () => this.preview.fit(), h: () => this.preview.setTool('hand'), v: () => this.preview.setTool('crop'), arrowleft: () => this.position(this.playhead - (event.shiftKey ? 5 : 1)), arrowright: () => this.position(this.playhead + (event.shiftKey ? 5 : 1)), ',': () => $('step-back').click(), '.': () => $('step-forward').click(), delete: () => this.deleteSelection() };
       if (actions[key]) { event.preventDefault(); actions[key](); }
     });
     document.addEventListener('keyup', event => {
       if (event.key !== ' ' || !this.spaceHeld) return;
-      event.preventDefault(); this.spaceHeld = false; $('preview-viewport').classList.remove('space-pan');
-      if (!this.spaceUsed && !this.busy && !$('edit-panel').hidden) this.play();
-    });
+      event.preventDefault(); event.stopPropagation(); this.spaceHeld = false; $('preview-viewport').classList.remove('space-pan');
+      if (!this.spaceUsed && !this.busy && this.source) this.play();
+    }, true);
     document.defaultView?.addEventListener('blur', () => {
       this.spaceHeld = false; $('preview-viewport').classList.remove('space-pan');
     });

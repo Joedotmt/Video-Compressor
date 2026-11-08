@@ -28,7 +28,6 @@ function validate() {
   if (source) {
     try {
       job = plan({ ...Object.fromEntries(fields.map(id => [id, $(id).value])), audio: $('audio').checked }, source, editor.getEdits());
-      if (!$('output-name').value.trim() || /[/\\\x00-\x1f]/.test($('output-name').value)) { job = null; throw new Error('Enter a filename without slashes or control characters.'); }
       const hasEdits = editor.segments.length > 0 || editor.hasCrop();
       $('edit-summary').hidden = !hasEdits;
       $('edit-summary').textContent = hasEdits ? `Edits: ${durationLabel(job.duration)} output · crop ${job.crop.width} × ${job.crop.height} at ${job.crop.x}, ${job.crop.y}. Applied on export.` : '';
@@ -85,7 +84,6 @@ async function openFile(selected) {
     $('source-summary').textContent = `${source.width} × ${source.height} · ${number(source.fps)} fps · ${durationLabel(source.duration)} · ${number(source.sizeMB)} MB`;
     $('target').value = Math.max(.01, source.sizeMB).toFixed(2);
     resetVideo(); resetAudio(); $('speed').value = '1';
-    $('output-name').value = `${file.name.replace(/\.[^.]+$/, '')}_compressed.mp4`;
     $('audio-hint').textContent = source.audio ? 'Include audio in the compressed video' : 'This video has no audio track.';
   } catch (error) { if (!task.cancelled) message(error.message || 'Could not read the video.', true); }
   finally { runner = null; setBusy(false); }
@@ -150,7 +148,7 @@ $('cancel').addEventListener('click', () => { runner?.cancel(); $('cancel').disa
 $('settings').addEventListener('submit', async event => {
   event.preventDefault(); validate(); if (!job || busy) return;
   const currentJob = { ...job };
-  const outputName = $('output-name').value.trim().replace(/(?:\.mp4)?$/i, '.mp4');
+  const outputName = `${file.name.replace(/\.[^.]+$/, '')}_compressed.mp4`;
   clearOutput(); message(); setBusy(true); started = Date.now();
   activity('Preparing export…', 'Loading the encoder. Processing stays on this device.');
   const task = newRunner(currentJob.duration); runner = task;

@@ -32,6 +32,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           timeout 180 node scripts/smoke-engines.mjs
+          timeout 180 node scripts/smoke-av1-input.mjs
           timeout 30 node scripts/smoke-worker.mjs
       - name: Upload Pages site
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'

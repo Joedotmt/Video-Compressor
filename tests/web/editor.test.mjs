@@ -496,3 +496,55 @@ for (const videoFrames of [true, false]) {
     }
   });
 }
+
+test('Space controls playback from focused controls without triggering their default actions', () => {
+  reset();
+  let plays = 0;
+  const original = editor.play;
+  editor.play = () => { plays++; };
+  const space = (target, type, repeat = false) => {
+    const event = new dom.window.KeyboardEvent(type, { key: ' ', repeat, bubbles: true, cancelable: true });
+    target.dispatchEvent(event); return event;
+  };
+  try {
+    for (const id of ['step-forward', 'step-back', 'play', 'mark-in', 'preview-fit', 'preview-mute', 'preview-volume-toggle', 'preview-kept', 'preview-volume']) {
+      const target = $(id), before = plays, position = editor.playhead;
+      target.focus();
+      assert.equal(space(target, 'keydown').defaultPrevented, true, id);
+      space(target, 'keydown', true); space(target, 'keydown', true);
+      assert.equal(space(target, 'keyup').defaultPrevented, true, id);
+      assert.equal(plays, before + 1); assert.equal(editor.playhead, position);
+      assert.equal(editor.spaceHeld, false);
+    }
+    for (const id of ['playhead-time', 'crop-width', 'crop-ratio']) {
+      const before = plays;
+      assert.equal(space($(id), 'keydown').defaultPrevented, false);
+      space($(id), 'keyup'); assert.equal(plays, before);
+    }
+    $('edit-panel').hidden = true;
+    const before = plays;
+    space($('compress'), 'keydown'); space($('compress'), 'keyup');
+    assert.equal(plays, before + 1);
+    const enter = new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    $('step-forward').dispatchEvent(enter); assert.equal(enter.defaultPrevented, false);
+  } finally { editor.play = original; $('edit-panel').hidden = false; }
+});
+
+test('preview volume and mute restore the previous level without changing edits', () => {
+  reset();
+  const video = editor.video, before = editor.getEdits();
+  const volume = percent => { $('preview-volume').value = percent; $('preview-volume').dispatchEvent(new dom.window.Event('input')); };
+  volume(35);
+  assert.equal(video.volume, .35); assert.equal(video.muted, false);
+  assert.equal($('preview-volume-value').value, '35%');
+  $('preview-mute').click();
+  assert.equal(video.muted, true); assert.equal($('preview-volume-toggle').dataset.muted, 'true');
+  assert.equal($('preview-mute').textContent, 'Unmute');
+  $('preview-mute').click(); assert.equal(video.muted, false); assert.equal(video.volume, .35);
+  volume(0); $('preview-mute').click(); assert.equal(video.volume, .35);
+  video.volume = .6; video.dispatchEvent(new dom.window.Event('volumechange'));
+  assert.equal($('preview-volume').value, '60');
+  assert.deepEqual(editor.getEdits(), before);
+  reset(); assert.equal(video.volume, .6); // Replacing the video keeps listening volume.
+  volume(100);
+});

@@ -44,9 +44,12 @@ test('tabs, edit validation, automatic dimensions and export share the same job'
   assert.equal($('compress').textContent.trim(), 'Export');
   assert.ok($('compress').closest('.app-header')); assert.ok($('replace').closest('.app-header'));
   assert.ok($('edit-tab').closest('.app-header'));
+  assert.equal($('output-name'), null);
+  input('preview-volume', '0');
   $('compress').click();
   assert.equal($('edit-controls').disabled, true);
   assert.equal(submitted.duration, 2.5);
+  assert.equal(submitted.audio, true); // Preview volume never changes exported audio.
   assert.deepEqual(submitted.segments, [{ start: 1, end: 3 }, { start: 5, end: 8 }]);
   assert.deepEqual(submitted.crop, { x: 11, y: 0, width: 200, height: 480 });
   assert.equal(submitted.width, 160);
