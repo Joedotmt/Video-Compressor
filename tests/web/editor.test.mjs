@@ -369,7 +369,7 @@ test('preview pans freely and zooms below fit; only Fit or Z recenters it', () =
   assert.ok(preview.center.x < -1000); assert.deepEqual(editor.getEdits(), before);
 });
 test('crop overlay controls remain editable without triggering preview pan or zoom', () => {
-  reset(); editor.preview.zoom(2); editor.preview.setTool('hand');
+  reset(); editor.preview.zoom(2); editor.preview.setTool('crop');
   assert.equal($('inspector').parentElement, $('preview-viewport'));
   const before = { ...editor.preview.geometry };
   editor.preview.begin({ target: $('crop-width'), button: 0, pointerId: 1, clientX: 300, clientY: 100 });
@@ -718,4 +718,43 @@ test('Fit and Z frame the stretched crop in Hand and Scale, and the source in Cr
   assert.equal(preview.geometry.top, g.top);
   assert.deepEqual(editor.getEdits(), before);
   assert.deepEqual(editor.getOutputSize(), { width: 400, height: 60 });
+});
+
+test('Hand consistently shows only the cropped output regardless of previous editing tool', () => {
+  reset(); editor.preview.zoom(1);
+  editor.crop = { x: 40, y: 20, width: 320, height: 240 }; editor.renderCrop(); editor.setOutputSize(480, 120);
+  const states = [];
+  for (const previous of ['crop', 'scale']) {
+    editor.preview.setTool(previous); editor.preview.setTool('hand');
+    assert.equal($('crop-overlay').hidden, true);
+    assert.equal($('inspector').hidden, true);
+    assert.equal($('crop-fields').hidden, true); assert.equal($('scale-fields').hidden, true);
+    assert.equal($('scale-reference').hidden, true);
+    assert.equal(editor.preview.cropSelected, false);
+    editor.preview.selectCrop(true); assert.equal($('inspector').hidden, true);
+    states.push({ clip: editor.video.style.clipPath, geometry: { ...editor.preview.geometry }, classes: $('preview-viewport').className });
+  }
+  assert.deepEqual(states[0], states[1]); assert.match(states[0].clip, /^inset/);
+  editor.preview.setTool('scale'); assert.equal($('crop-overlay').hidden, false); assert.equal($('inspector').hidden, false);
+  assert.equal($('scale-fields').hidden, false);
+  editor.preview.setTool('crop'); assert.equal(editor.video.style.clipPath, ''); assert.equal($('crop-fields').hidden, false);
+});
+
+test('Scale reference retains original resolution while output stretches and follows viewing zoom', () => {
+  reset(); editor.preview.zoom(1); editor.preview.setTool('scale');
+  editor.crop = { x: 40, y: 20, width: 320, height: 240 }; editor.renderCrop();
+  const reference = $('scale-reference');
+  for (const size of [[160, 120], [960, 600]]) {
+    editor.setOutputSize(...size);
+    assert.equal(reference.hidden, false);
+    assert.equal(parseFloat(reference.style.width), source.width);
+    assert.equal(parseFloat(reference.style.height), source.height);
+    const g = editor.preview.geometry;
+    assert.equal(parseFloat(reference.style.left), g.left + editor.crop.x * g.scaleX);
+    assert.equal(parseFloat(reference.style.top), g.top + editor.crop.y * g.scaleY);
+  }
+  editor.preview.zoom(2);
+  assert.equal(parseFloat(reference.style.width), source.width * 2);
+  assert.equal(parseFloat(reference.style.height), source.height * 2);
+  for (const tool of ['hand', 'crop']) { editor.preview.setTool(tool); assert.equal(reference.hidden, true); }
 });

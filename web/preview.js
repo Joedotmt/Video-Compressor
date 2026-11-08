@@ -18,9 +18,9 @@ export class PreviewView {
   setTool(tool) {
     this.editor.finishCropDrag?.();
     this.tool = tool;
-    if (tool !== 'hand') this.editTool = tool;
+    this.editTool = tool;
     $('preview-scale-tool').setAttribute('aria-pressed', tool === 'scale');
-    $('crop-fields').hidden = this.editTool === 'scale';
+    $('crop-fields').hidden = tool !== 'crop';
     $('scale-fields').hidden = this.editTool !== 'scale';
     this.viewport.classList.toggle('scale-tool', this.editTool === 'scale');
     for (const handle of document.querySelectorAll('.crop-handle')) handle.setAttribute('aria-label', handle.getAttribute('aria-label').replace(/Resize (crop|output)/, this.editTool === 'scale' ? 'Resize output' : 'Resize crop'));
@@ -28,10 +28,13 @@ export class PreviewView {
     $('preview-crop-tool').setAttribute('aria-pressed', tool === 'crop');
     $('preview-hand-tool').setAttribute('aria-pressed', tool === 'hand');
     this.viewport.classList.toggle('hand-tool', tool === 'hand');
-    if (tool !== 'hand') this.selectCrop(true);
+    $('crop-overlay').hidden = tool === 'hand';
+    $('scale-reference').hidden = tool !== 'scale';
+    this.selectCrop(tool !== 'hand');
     this.render();
   }
   selectCrop(selected) {
+    selected = selected && this.tool !== 'hand';
     this.cropSelected = selected;
     this.viewport.classList.toggle('crop-deselected', !selected);
     $('inspector').hidden = !selected;
@@ -57,7 +60,15 @@ export class PreviewView {
     this.editor.previewZoom = this.geometry.scale;
     for (const key of ['width', 'height', 'left', 'top']) $('video-stage').style[key] = `${this.geometry[key]}px`;
     const crop = this.editor.crop;
-    this.editor.video.style.clipPath = this.editTool === 'scale' ? `inset(${crop.y / source.height * 100}% ${(source.width - crop.x - crop.width) / source.width * 100}% ${(source.height - crop.y - crop.height) / source.height * 100}% ${crop.x / source.width * 100}%)` : '';
+    this.editor.video.style.clipPath = this.tool !== 'crop' ? `inset(${crop.y / source.height * 100}% ${(source.width - crop.x - crop.width) / source.width * 100}% ${(source.height - crop.y - crop.height) / source.height * 100}% ${crop.x / source.width * 100}%)` : '';
+    // Original pixel dimensions at the same viewing zoom, behind the output.
+    // Share the output's top-left corner so their extents can be compared directly.
+    const g = this.geometry, reference = $('scale-reference');
+    reference.style.left = `${g.left + crop.x * g.scaleX}px`;
+    reference.style.top = `${g.top + crop.y * g.scaleY}px`;
+    reference.style.width = `${source.width * g.scale}px`;
+    reference.style.height = `${source.height * g.scale}px`;
+    reference.title = `Original resolution: ${source.width} × ${source.height}`;
     this.positionInspector();
     if (document.activeElement !== $('preview-zoom')) $('preview-zoom').value = Number((this.geometry.scale * 100).toFixed(2));
     $('preview-zoom').min = minimumPreviewScale * 100;

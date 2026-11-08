@@ -486,7 +486,8 @@ input[aria-invalid="true"] { border-color: var(--error); outline: 1px solid var(
 }
 
 /* Scale uses the same rectangle and camera as crop. */
-.scale-tool #video-stage { outline: none; box-shadow: none; }
+.scale-tool #video-stage, .hand-tool #video-stage { outline: none; box-shadow: none; }
+#scale-reference { position: absolute; border: 1px dashed #ffffff66; pointer-events: none; }
 .scale-tool #crop-box { box-shadow: none; cursor: default; }
 .scale-tool .crop-grid { display: none; }
 .crop-strip input[type="checkbox"] { width: 13px; height: 13px; padding: 0; }
