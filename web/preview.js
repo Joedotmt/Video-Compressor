@@ -99,6 +99,7 @@ export class PreviewView {
   begin(event) {
     if (event.target?.closest('.crop-inspector')) return;
     if (this.editor.busy || !this.editor.source || ![0, 1].includes(event.button)) return;
+    this.viewport.focus({ preventScroll: true });
     this.render(); if (!this.geometry) return;
     const point = this.relative(event);
     if (event.pointerType === 'touch') this.points.set(event.pointerId, point);

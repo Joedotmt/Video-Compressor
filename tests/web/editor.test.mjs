@@ -758,3 +758,34 @@ test('Scale reference retains original resolution while output stretches and fol
   assert.equal(parseFloat(reference.style.height), source.height * 2);
   for (const tool of ['hand', 'crop']) { editor.preview.setTool(tool); assert.equal(reference.hidden, true); }
 });
+
+test('timeline pointer interactions leave text editing and immediately enable I/O shortcuts', () => {
+  const cases = ['timeline-ruler', 'timeline', 'playhead-handle', 'segment', 'point', 'timeline-window-pan', 'middle-pan'];
+  for (const name of cases) {
+    reset(); editor.position(1); editor.markIn(); editor.position(3); editor.markOut();
+    const target = name === 'segment' ? document.querySelector('.timeline-segment button') : name === 'point' ? $('timeline-points').firstElementChild : $(name === 'middle-pan' ? 'timeline' : name);
+    for (const id of ['timeline-scroll', 'timeline', 'timeline-ruler', 'playhead-handle', 'timeline-navigator']) $(id).setPointerCapture = () => {};
+    $('crop-width').focus(); const value = $('crop-width').value;
+    const down = new dom.window.Event('pointerdown', { bubbles: true, cancelable: true });
+    Object.assign(down, { button: name === 'middle-pan' ? 1 : 0, clientX: 200, clientY: 10, pointerId: 1 });
+    target.dispatchEvent(down);
+    assert.equal(document.activeElement, $('timeline-scroll'), name);
+    editor.finishScrub?.(); editor.finishTrimDrag?.(); editor.navigation.finish?.();
+    editor.position(5); key('i', document.activeElement);
+    assert.ok(editor.points.some(point => point.type === 'in' && point.time === 5), name);
+    editor.position(7); key('o', document.activeElement);
+    assert.ok(editor.points.some(point => point.type === 'out' && point.time === 7), name);
+    assert.equal($('crop-width').value, value);
+  }
+});
+
+test('preview gestures release input focus while inspector interaction keeps it', () => {
+  reset(); editor.preview.setTool('hand'); $('preview-viewport').setPointerCapture = () => {};
+  $('playhead-time').focus();
+  const event = target => ({ target, button: 0, pointerId: 1, clientX: 100, clientY: 100, preventDefault() {}, stopPropagation() {} });
+  editor.preview.begin(event($('preview-canvas')));
+  assert.equal(document.activeElement, $('preview-viewport'));
+  editor.preview.end(event($('preview-canvas')));
+  editor.preview.setTool('crop'); $('crop-width').focus(); editor.preview.begin(event($('crop-width')));
+  assert.equal(document.activeElement, $('crop-width'));
+});

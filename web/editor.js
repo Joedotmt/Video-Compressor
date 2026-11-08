@@ -500,6 +500,11 @@ export class VideoEditor {
     if (!this.cropDragging || this.preview.editTool === 'scale') this.preview.render();
   }
   bind(onPreview) {
+    // Drag handlers prevent the browser's default focus change. Move focus to a
+    // stable timeline element before those handlers so I/O and playback work.
+    for (const id of ['timeline-scroll', 'timeline-navigator']) $(id).addEventListener('pointerdown', event => {
+      if (this.source && !this.busy && [0, 1].includes(event.button)) $('timeline-scroll').focus({ preventScroll: true });
+    }, true);
     $('timeline-scroll').onscroll = () => { this.renderRuler(); this.navigation.render(); };
     $('timeline-scroll').addEventListener('wheel', event => {
       if (!this.source || this.busy || event.ctrlKey || event.metaKey) return;

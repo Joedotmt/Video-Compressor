@@ -719,13 +719,11 @@
               </section>
             </section>
           </fieldset>
-          <p id="edit-error" class="error" role="alert"></p>
         </section>
         <p id="edit-summary" class="description" hidden></p>
       </div>
 
       <div class="bottom-bar">
-        <p id="validation" class="error" role="alert"></p>
         <div id="activity" hidden>
           <p id="activity-title">Preparing…</p>
           <progress id="progress" max="100" value="0"></progress>
@@ -741,6 +739,10 @@
           <p id="result-summary" class="description"></p>
           <a id="download" download>Download Video</a>
         </div>
+      </div>
+      <div id="notifications">
+        <p id="edit-error" class="error" role="alert"></p>
+        <p id="validation" class="error" role="alert"></p>
         <p id="message" role="status" aria-live="polite"></p>
       </div>
     </main>

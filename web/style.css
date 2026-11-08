@@ -126,7 +126,7 @@ summary { padding: 8px 0; }
 .advanced summary .description { display: block; font-weight: 400; }
 .advanced-content { border-top: 1px solid var(--separator); }
 #codec-hint { padding: 0 14px 12px; }
-.bottom-bar:not(:has(#activity:not([hidden]), #result:not([hidden]), #message:not(:empty), #validation:not(:empty))) { display: none; }
+.bottom-bar:not(:has(#activity:not([hidden]), #result:not([hidden]))) { display: none; }
 .bottom-bar { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 10px; }
 #compress { min-width: 70px; }
 #compress:not(:disabled) { color: #fff; background: var(--accent); border-color: var(--accent); }
@@ -186,7 +186,8 @@ input[aria-invalid="true"] { border-color: var(--error); outline: 1px solid var(
 .editing main { max-width: none; padding: 0; }
 .editing .bottom-bar { margin: 0; padding: 4px 12px; flex-shrink: 0; max-height: 25dvh; overflow: auto; }
 .editing #edit-summary { display: none; }
-#edit-error { margin: 0; padding: 4px 12px; }
+#notifications { position: fixed; right: 12px; bottom: 12px; z-index: 30; width: max-content; max-width: min(32rem, calc(100vw - 24px)); max-height: 25dvh; overflow: auto; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+#notifications > p { margin: 0; padding: 8px 12px; border: 1px solid var(--border); background: var(--surface); border-radius: 4px; overflow-wrap: anywhere; pointer-events: auto; }
 .editing #compress:not(:disabled) { color: #172536; }
 #edit-panel { margin: 0; }
 #edit-controls { display: grid; grid-template-columns: minmax(0, 1fr); }
