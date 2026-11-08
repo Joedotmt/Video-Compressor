@@ -51,7 +51,7 @@ input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var
 #filename { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
 #source-summary { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
 h1 { font-size: 13px; font-weight: 600; margin: 0; }
-main { max-width: 960px; margin: auto; padding: 12px 16px; }
+main { max-width: 558px; margin: auto; padding: 12px 16px; }
 h2 { font-size: 14px; font-weight: 600; margin: 0; }
 section, .advanced { margin-bottom: 14px; }
 #empty-state { display: grid; place-items: center; min-height: clamp(280px, 65dvh, 640px); margin: 0; padding: 24px 0; }
