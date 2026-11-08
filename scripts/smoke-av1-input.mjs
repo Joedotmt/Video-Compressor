@@ -63,6 +63,8 @@ try {
     const video = info.streams.find(s => s.codec_type === 'video');
     assert.equal(video.codec_name, { libx264: 'h264', libx265: 'hevc', 'libaom-av1': 'av1' }[codec]);
     assert.equal(video.width, 64); assert.equal(video.height, 48); assert.equal(video.avg_frame_rate, '12/1');
+    assert.equal(video.sample_aspect_ratio, '1:1', `${codec}: square pixels through the AV1 path`);
+    assert.equal(video.display_aspect_ratio, '4:3', `${codec}: crop stretches to the requested output shape`);
     assert.ok(info.streams.some(s => s.codec_type === 'audio'));
     assert.ok(Math.abs(Number(info.format.duration) - .5) < .15);
     const actual = execFileSync('ffmpeg', ['-v', 'error', '-threads', '1', '-i', output, '-an', '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-']);

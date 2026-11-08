@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeEdits, segmentsFromPoints, dragCrop, fitRatio, parseTime, timecode, zoomScrollPosition, previewGeometry, timelineGeometry, moveSegment, zoomPreviewAt, cropControlsPosition } from '../../web/edits.js';
+import { resizedDimensions, dragResize, normalizeEdits, segmentsFromPoints, dragCrop, fitRatio, parseTime, timecode, zoomScrollPosition, previewGeometry, timelineGeometry, moveSegment, zoomPreviewAt, cropControlsPosition } from '../../web/edits.js';
 import { plan, command, metadata } from '../../web/compressor.js';
 const source = { duration: 20, width: 1920, height: 1080, audio: true };
 test('kept ranges are sorted and overlaps merged; removed ranges are inverted', () => {
@@ -107,16 +107,22 @@ test('unpaired points remain available for later marks; coincident Out/In points
   assert.deepEqual(segmentsFromPoints(split, 250).map(({ start, end }) => [start, end]), [[0, 100], [100, 250]]);
 });
 
-test('preview pan stays within video edges and zooming below fit centers every aspect ratio', () => {
+test('preview camera is unrestricted and cursor anchoring survives crossing fit scale', () => {
+  const viewport = { width: 640, height: 480 }, anchor = { x: 25, y: 450 };
   for (const source of [{ width: 1920, height: 1080 }, { width: 1080, height: 1920 }, { width: 640, height: 480 }]) {
     for (const center of [{ x: -10000, y: 10000 }, { x: 10000, y: -10000 }]) {
       const zoom = previewGeometry(source, 640, 480, 4, center);
-      assert.ok(zoom.left <= 20 + 1e-8 && zoom.left + zoom.width >= 620 - 1e-8);
-      assert.ok(zoom.top <= 20 + 1e-8 && zoom.top + zoom.height >= 460 - 1e-8);
-      const fit = previewGeometry(source, 640, 480, .001, center);
-      assert.equal(fit.scale, fit.fitScale);
-      assert.ok(Math.abs(fit.left + fit.width / 2 - 320) < 1e-8);
-      assert.ok(Math.abs(fit.top + fit.height / 2 - 240) < 1e-8);
+      assert.deepEqual(zoom.center, center);
+      const tiny = previewGeometry(source, 640, 480, .001, center);
+      assert.equal(tiny.scale, .001); assert.deepEqual(tiny.center, center);
+    }
+    let current = previewGeometry(source, 640, 480);
+    const pixel = { x: (anchor.x - current.left) / current.scale, y: (anchor.y - current.top) / current.scale };
+    for (const scale of [current.fitScale * .9, .001, current.fitScale * 1.1, 8]) {
+      const center = zoomPreviewAt(current, anchor, viewport, scale);
+      current = previewGeometry(source, 640, 480, scale, center);
+      assert.ok(Math.abs((anchor.x - current.left) / current.scale - pixel.x) < 1e-7);
+      assert.ok(Math.abs((anchor.y - current.top) / current.scale - pixel.y) < 1e-7);
     }
   }
 });
@@ -144,5 +150,18 @@ test('zoomed crop strip follows the top-left crop corner and stays inside the vi
     const pos = cropControlsPosition(geometry, crop, viewport, controls);
     assert.ok(pos.left >= 8 && pos.left + controls.width <= 792);
     assert.ok(pos.top >= 8 && pos.top + controls.height <= 592);
+  }
+});
+
+
+test('output sizing rounds to encoder pixels without accumulating crop rounding; resizing locks ratios and bounds', () => {
+  const stretch = { x: .3333333333333333, y: 2 };
+  assert.deepEqual(resizedDimensions({ width: 321, height: 81 }, stretch), { width: 106, height: 162 });
+  assert.deepEqual(resizedDimensions({ width: 324, height: 81 }, stretch), { width: 108, height: 162 });
+  assert.deepEqual(dragResize({ width: 640, height: 480 }, 'e', 320, 0, true), { width: 960, height: 720 });
+  assert.deepEqual(dragResize({ width: 640, height: 480 }, 'nw', -320, -240, true), { width: 960, height: 720 });
+  for (const handle of ['nw','n','ne','e','se','s','sw','w']) for (const delta of [-100000, 100000]) for (const locked of [false, true]) {
+    const size = dragResize({ width: 640, height: 480 }, handle, delta, delta, locked);
+    for (const n of Object.values(size)) assert.ok(n >= 2 && n <= 16384 && n % 2 === 0);
   }
 });

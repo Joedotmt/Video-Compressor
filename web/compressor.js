@@ -68,7 +68,9 @@ export function command(job, input, output = 'output.mp4', { intermediate = fals
   const args = ['-y', '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1', ...decoderOptions(job.inputCodec), '-i', input];
   const edited = job.segments && (job.segments.length !== 1 || job.segments[0].start !== 0 || job.segments[0].end !== job.sourceDuration);
   const crop = job.crop ? `crop=${job.crop.width}:${job.crop.height}:${job.crop.x}:${job.crop.y}:exact=1,` : '';
-  const videoFilter = `${crop}scale=${job.width}:${job.height},setpts=(PTS-STARTPTS)/${job.speed},fps=${job.fps}`;
+  // The requested dimensions define the display shape, including intentional
+  // stretching. Do not let scale preserve the old shape via non-square pixels.
+  const videoFilter = `${crop}scale=${job.width}:${job.height},setsar=1,setpts=(PTS-STARTPTS)/${job.speed},fps=${job.fps}`;
   if (edited) {
     const n = job.segments.length, graph = [];
     graph.push(`[0:v:0]split=${n}${job.segments.map((_, i) => `[vs${i}]`).join('')}`);

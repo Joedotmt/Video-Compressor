@@ -1,11 +1,10 @@
-import { plan, presets, av1Presets, tunes, durationLabel } from './compressor.js';
+import { expression, plan, presets, av1Presets, tunes, durationLabel } from './compressor.js';
 import { BrowserCompressor } from './engine.js';
 import { VideoEditor } from './editor.js';
 import { initializeIsolation } from './isolation.js';
 const $ = id => document.getElementById(id);
 const fields = ['target', 'width', 'height', 'fps', 'speed', 'audioKbps', 'codec', 'preset', 'tune'];
 let initializing = true;
-let automaticDimensions = true;
 let file = null, source = null, job = null, busy = false, runner = null, outputURL = null, logs = [], started = 0;
 const editor = new VideoEditor(editsChanged, makePreview);
 const number = n => n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -45,13 +44,14 @@ function placeDiagnostics() {
 function setBusy(value) {
   busy = value; $('controls').disabled = value || !source;
   editor.setBusy(value);
-  $('edit-tab').disabled = !source;
+  document.body.classList.toggle('editing', !!source && !$('edit-panel').hidden);
   $('dropzone').disabled = value; $('replace').disabled = value;
   $('activity').hidden = !value; $('cancel').disabled = false;
   $('cancel').hidden = !value;
-  $('compress').hidden = !source;
   $('editor').hidden = !source; $('source-info').hidden = !source;
-  $('empty-state').hidden = !!source || value;
+  $('empty-state').hidden = !!source;
+  $('empty-state').setAttribute('aria-busy', String(value && !source));
+  $('dropzone-label').textContent = value && !source ? 'Reading video…' : 'Drag a video here or click to choose';
   placeDiagnostics();
   if (!value && !$('edit-panel').hidden) editor.refreshView();
   validate();
@@ -79,7 +79,7 @@ async function openFile(selected) {
   try {
     const info = await task.probe(selected);
     if (task.cancelled) return;
-    source = info; file = selected; automaticDimensions = true; editor.reset(file, source);
+    source = info; file = selected; editor.reset(file, source);
     $('filename').textContent = file.name; $('filename').title = file.name;
     $('source-summary').textContent = `${source.width} × ${source.height} · ${number(source.fps)} fps · ${durationLabel(source.duration)} · ${number(source.sizeMB)} MB`;
     $('target').value = Math.max(.01, source.sizeMB).toFixed(2);
@@ -90,20 +90,14 @@ async function openFile(selected) {
 }
 function resetVideo() {
   if (!source) return;
-  automaticDimensions = true;
-  const dimensions = editor.crop || source;
-  $('width').value = String(dimensions.width); $('height').value = String(dimensions.height); $('fps').value = String(source.fps);
+  editor.resetScale(); $('fps').value = String(source.fps);
 }
 function editsChanged() {
   if (!source) return;
-  if (automaticDimensions) {
-    const dimensions = editor.crop || source;
-    $('width').value = String(dimensions.width); $('height').value = String(dimensions.height);
-  }
   clearOutput(); validate();
 }
 function showTab(name) {
-  document.body.classList.toggle('editing', name === 'edit');
+  document.body.classList.toggle('editing', !!source && name === 'edit');
   for (const tab of ['compression', 'edit']) {
     const active = tab === name;
     $(`${tab}-tab`).setAttribute('aria-selected', String(active));
@@ -127,7 +121,7 @@ async function makePreview() {
 for (const name of ['compression', 'edit']) {
   $(`${name}-tab`).onclick = () => showTab(name);
   $(`${name}-tab`).onkeydown = event => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || $('edit-tab').disabled) return;
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault(); event.stopPropagation(); const next = event.key === 'Home' ? 'compression' : event.key === 'End' ? 'edit' : name === 'edit' ? 'compression' : 'edit';
     showTab(next); $(`${next}-tab`).focus();
   };
@@ -140,7 +134,13 @@ document.addEventListener('dragover', event => { event.preventDefault(); if (!bu
 document.addEventListener('dragleave', event => { if (!event.relatedTarget) document.querySelector('main').classList.remove('dragover'); });
 document.addEventListener('drop', event => { event.preventDefault(); document.querySelector('main').classList.remove('dragover'); if (!busy) openFile(event.dataTransfer.files[0]); });
 $('codec').addEventListener('change', () => { encoderOptions(); validate(); });
-$('settings').addEventListener('input', event => { if (['width', 'height'].includes(event.target.id)) automaticDimensions = false; validate(); });
+$('settings').addEventListener('input', event => {
+  if (source && ['width', 'height'].includes(event.target.id)) {
+    try { editor.setOutputSize(expression($('width').value), expression($('height').value), { keepField: event.target.id }); }
+    catch { /* Form validation reports incomplete or invalid expressions. */ }
+  }
+  clearOutput(); validate();
+});
 $('reset-target').addEventListener('click', () => { $('target').value = Math.max(.01, source.sizeMB).toFixed(2); validate(); });
 $('reset-video').addEventListener('click', () => { resetVideo(); validate(); });
 $('reset-audio').addEventListener('click', () => { resetAudio(); validate(); });

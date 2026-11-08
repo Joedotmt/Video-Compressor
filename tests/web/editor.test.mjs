@@ -242,7 +242,8 @@ test('a second touch switches from crop dragging to pinch/pan without moving the
   assert.ok(Math.abs(editor.preview.scale - initial * 2) < 1e-8);
   assert.deepEqual(editor.getEdits(), before);
   editor.preview.move(touch(1, 490, 220));
-  assert.equal(editor.preview.scale, null); assert.equal(editor.preview.center, null);
+  assert.ok(editor.preview.scale < initial); assert.ok(editor.preview.scale > 0);
+  assert.notEqual(editor.preview.center, null);
   editor.preview.end(touch(2, 500, 220)); editor.preview.end(touch(1, 100, 220));
   assert.equal(editor.preview.gesture, null); assert.equal(editor.preview.points.size, 0);
   editor.dispose();
@@ -339,7 +340,7 @@ test('navigator ends zoom around the opposite edge, body pans, and fit restores 
   assert.deepEqual(editor.getEdits(), before); assert.equal($('timeline-zoom'), null);
 });
 
-test('all zoom-out controls restore a centered fit after zooming and panning', () => {
+test('preview pans freely and zooms below fit; only Fit or Z recenters it', () => {
   reset(); const preview = editor.preview, view = $('preview-viewport');
   const before = editor.getEdits();
   const displaced = () => { preview.zoom(4); preview.center = { x: -10000, y: 10000 }; preview.render(); };
@@ -347,15 +348,25 @@ test('all zoom-out controls restore a centered fit after zooming and panning', (
     assert.equal(preview.scale, null); assert.equal(preview.center, null);
     assert.ok(Math.abs(preview.geometry.left + preview.geometry.width / 2 - view.clientWidth / 2) < 1e-8);
     assert.ok(Math.abs(preview.geometry.top + preview.geometry.height / 2 - view.clientHeight / 2) < 1e-8);
-    assert.equal($('preview-zoom-out').disabled, true);
+    assert.equal($('preview-zoom-out').disabled, false);
     assert.deepEqual(editor.getEdits(), before);
   };
-  displaced();
+  displaced(); assert.deepEqual(preview.center, { x: -10000, y: 10000 });
   for (let i = 0; i < 30; i++) view.dispatchEvent(new dom.window.WheelEvent('wheel', { deltaY: 100, clientX: 10, clientY: 10, bubbles: true, cancelable: true }));
-  centered();
-  displaced(); for (let i = 0; i < 30; i++) $('preview-zoom-out').click(); centered();
-  displaced(); $('preview-zoom').value = '1'; $('preview-zoom').dispatchEvent(new dom.window.Event('change')); centered();
-  assert.ok(Number($('preview-zoom').value) > 1);
+  assert.ok(preview.scale < preview.geometry.fitScale); assert.notEqual(preview.center, null);
+  key('z'); centered();
+  displaced(); for (let i = 0; i < 30; i++) $('preview-zoom-out').click();
+  assert.ok(preview.scale < preview.geometry.fitScale); assert.notEqual(preview.center, null);
+  $('preview-fit').click(); centered();
+  displaced(); $('preview-zoom').value = '1'; $('preview-zoom').dispatchEvent(new dom.window.Event('change'));
+  assert.equal(preview.scale, .01); assert.equal($('preview-zoom').value, '1');
+  $('preview-zoom').value = '.01'; $('preview-zoom').dispatchEvent(new dom.window.Event('change'));
+  assert.equal(preview.scale, .0001); assert.equal($('preview-zoom-out').disabled, true);
+  key('z'); centered();
+  view.setPointerCapture = () => {};
+  const pointer = x => ({ target: view, button: 1, pointerId: 1, clientX: x, clientY: 100, preventDefault() {}, stopPropagation() {} });
+  preview.begin(pointer(100)); preview.move(pointer(10000)); preview.end(pointer(10000));
+  assert.ok(preview.center.x < -1000); assert.deepEqual(editor.getEdits(), before);
 });
 test('crop overlay controls remain editable without triggering preview pan or zoom', () => {
   reset(); editor.preview.zoom(2); editor.preview.setTool('hand');
@@ -547,4 +558,121 @@ test('preview volume and mute restore the previous level without changing edits'
   assert.deepEqual(editor.getEdits(), before);
   reset(); assert.equal(video.volume, .6); // Replacing the video keeps listening volume.
   volume(100);
+});
+
+test('crop deselection hides controls without changing crop or camera; click, Enter, or V restores selection', () => {
+  reset(); editor.crop = { x: 100, y: 100, width: 300, height: 200 }; editor.renderCrop();
+  editor.preview.zoom(2);
+  const preview = editor.preview, view = $('preview-viewport'), box = $('crop-box');
+  const before = editor.getEdits(), camera = { ...preview.geometry };
+  const pointer = target => ({ target, button: 0, pointerId: 1, clientX: 10, clientY: 10, preventDefault() {}, stopPropagation() {} });
+  preview.begin(pointer($('preview-canvas')));
+  assert.equal(preview.cropSelected, false); assert.equal($('inspector').hidden, true);
+  assert.equal(view.classList.contains('crop-deselected'), true);
+  preview.render(); assert.deepEqual(preview.geometry, camera);
+  editor.drag(pointer(box)); assert.equal(editor.cropDragging, false);
+  let consumed = false;
+  preview.begin({ ...pointer(box), stopPropagation() { consumed = true; } });
+  assert.equal(consumed, true); assert.equal(editor.cropDragging, false);
+  assert.equal(preview.cropSelected, true); assert.equal($('inspector').hidden, false);
+  key('Escape', $('crop-width'));
+  assert.equal(preview.cropSelected, false); assert.equal(document.activeElement, view);
+  key('Enter', box); assert.equal(preview.cropSelected, true);
+  key('Escape', box); key('v'); assert.equal(preview.cropSelected, true);
+  assert.deepEqual(editor.getEdits(), before); assert.deepEqual(preview.geometry, camera);
+});
+
+test('crop and scale share geometry; further cropping preserves stretch and shared dimensions', () => {
+  reset(); editor.preview.zoom(1);
+  editor.crop = { x: 40, y: 20, width: 320, height: 240 }; editor.renderCrop();
+  const before = { ...editor.preview.geometry };
+  key('s'); assert.equal(editor.preview.tool, 'scale');
+  assert.deepEqual(editor.preview.geometry, before);
+  assert.equal($('crop-fields').hidden, true); assert.equal($('scale-fields').hidden, false);
+  $('scale-width').value = '320*2'; $('scale-width').dispatchEvent(new dom.window.Event('input'));
+  assert.deepEqual(editor.stretch, { x: 2, y: 1 });
+  assert.equal($('width').value, '640'); assert.equal($('scale-width').value, '320*2');
+  assert.equal(editor.preview.geometry.width, 1280); assert.equal(editor.preview.geometry.height, 480);
+  assert.match(editor.video.style.clipPath, /^inset/);
+  const stretched = { ...editor.preview.geometry };
+  key('v'); assert.deepEqual(editor.preview.geometry, stretched); assert.equal(editor.video.style.clipPath, '');
+  $('crop-width').value = '160'; $('crop-width').dispatchEvent(new dom.window.Event('input'));
+  assert.equal($('width').value, '320'); assert.deepEqual(editor.stretch, { x: 2, y: 1 });
+  assert.deepEqual(editor.preview.geometry, stretched);
+  key('s'); key('Escape', $('crop-box')); assert.equal($('inspector').hidden, true);
+  key('Enter', $('crop-box')); assert.equal($('inspector').hidden, false);
+  $('reset-scale').click(); assert.deepEqual(editor.stretch, { x: 1, y: 1 });
+  assert.equal($('width').value, '160'); assert.equal(editor.crop.x, 40);
+});
+
+test('all scale handles track screen deltas and keep the opposite edge or corner fixed', () => {
+  for (const handle of ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']) {
+    reset(); editor.preview.zoom(2);
+    editor.crop = { x: 40, y: 20, width: 320, height: 240 }; editor.renderCrop();
+    editor.setOutputSize(640, 120); editor.preview.setTool('scale');
+    const anchor = editor.resizeAnchor(handle), target = document.querySelector(`[data-handle="${handle}"]`);
+    target.setPointerCapture = () => {};
+    editor.drag({ target, button: 0, pointerId: 1, clientX: 100, clientY: 100, preventDefault() {} });
+    const move = new dom.window.Event('pointermove', { bubbles: true });
+    Object.assign(move, { pointerId: 1, clientX: 140, clientY: 120 }); target.dispatchEvent(move);
+    const size = editor.getOutputSize();
+    assert.equal(size.width, 640 + (handle.includes('e') ? 20 : handle.includes('w') ? -20 : 0));
+    assert.equal(size.height, 120 + (handle.includes('s') ? 10 : handle.includes('n') ? -10 : 0));
+    const g = editor.preview.geometry;
+    assert.ok(Math.abs(g.left + anchor.source.x * g.scaleX - anchor.screen.x) < 1e-7);
+    assert.ok(Math.abs(g.top + anchor.source.y * g.scaleY - anchor.screen.y) < 1e-7);
+    assert.deepEqual(editor.crop, { x: 40, y: 20, width: 320, height: 240 });
+    target.dispatchEvent(new dom.window.Event('pointerup')); assert.equal(editor.cropDragging, false);
+  }
+});
+
+test('scale fields validate, lock ratio and reset independently of cropping and preview zoom', () => {
+  reset(); editor.preview.zoom(2); editor.preview.setTool('scale');
+  $('scale-proportional').checked = true;
+  const input = value => { $('scale-width').value = value; $('scale-width').dispatchEvent(new dom.window.Event('input')); };
+  input('640/2'); assert.deepEqual(editor.getOutputSize(), { width: 320, height: 240 });
+  assert.equal(editor.preview.scale, 2);
+  input('0'); assert.throws(() => editor.getEdits(), /highlighted/);
+  assert.deepEqual(editor.getOutputSize(), { width: 320, height: 240 });
+  input('99999'); assert.throws(() => editor.getEdits(), /highlighted/);
+  $('reset-scale').click(); assert.doesNotThrow(() => editor.getEdits());
+  assert.deepEqual(editor.getOutputSize(), { width: 640, height: 480 });
+  editor.reset(new Blob(['new']), source); assert.equal(editor.preview.scale, null);
+  assert.deepEqual(editor.stretch, { x: 1, y: 1 }); assert.equal($('scale-proportional').checked, false);
+});
+
+test('nonuniform stretching keeps zoom anchors, pan and touch pinch in source coordinates', () => {
+  reset(); editor.preview.zoom(1); editor.setOutputSize(1280, 240);
+  const preview = editor.preview, view = $('preview-viewport'); view.setPointerCapture = () => {};
+  const screen = { x: 220, y: 180 }, old = preview.geometry;
+  const pixel = { x: (screen.x - old.left) / old.scaleX, y: (screen.y - old.top) / old.scaleY };
+  preview.zoom(2, screen);
+  assert.ok(Math.abs(preview.geometry.left + pixel.x * preview.geometry.scaleX - screen.x) < 1e-7);
+  assert.ok(Math.abs(preview.geometry.top + pixel.y * preview.geometry.scaleY - screen.y) < 1e-7);
+  const event = (id, x, y, touch = false) => ({ target: view, button: touch ? 0 : 1, pointerType: touch ? 'touch' : 'mouse', pointerId: id, clientX: x, clientY: y, preventDefault() {}, stopPropagation() {} });
+  const center = { ...preview.center };
+  preview.begin(event(1, 100, 100)); preview.move(event(1, 180, 140)); preview.end(event(1, 180, 140));
+  assert.equal(preview.center.x, center.x - 20); assert.equal(preview.center.y, center.y - 40);
+  const g = preview.geometry, mid = { x: 300, y: 200 };
+  const sourceMid = { x: (mid.x - g.left) / g.scaleX, y: (mid.y - g.top) / g.scaleY };
+  preview.begin(event(1, 200, 200, true)); preview.begin(event(2, 400, 200, true));
+  preview.move(event(1, 100, 200, true)); preview.move(event(2, 500, 200, true));
+  assert.equal(preview.scale, 4);
+  assert.ok(Math.abs(preview.geometry.left + sourceMid.x * preview.geometry.scaleX - mid.x) < 1e-7);
+  assert.ok(Math.abs(preview.geometry.top + sourceMid.y * preview.geometry.scaleY - mid.y) < 1e-7);
+  preview.end(event(1, 100, 200, true)); preview.end(event(2, 500, 200, true));
+});
+
+test('crop aspect presets describe the stretched output and source crop drags account for both axes', () => {
+  reset(); editor.preview.zoom(1); editor.setOutputSize(1280, 240);
+  $('crop-ratio').value = '1'; $('crop-ratio').dispatchEvent(new dom.window.Event('change'));
+  assert.deepEqual(editor.getOutputSize(), { width: 240, height: 240 });
+  assert.deepEqual(editor.stretch, { x: 2, y: .5 });
+  editor.crop = { x: 40, y: 20, width: 320, height: 240 }; editor.renderCrop();
+  const box = $('crop-box'); box.setPointerCapture = () => {};
+  $('video-stage').getBoundingClientRect = () => ({ width: 1280, height: 240 });
+  editor.drag({ target: box, button: 0, pointerId: 1, clientX: 100, clientY: 100, preventDefault() {} });
+  const move = new dom.window.Event('pointermove'); Object.assign(move, { clientX: 140, clientY: 110 }); box.dispatchEvent(move);
+  assert.equal(editor.crop.x, 60); assert.equal(editor.crop.y, 40);
+  box.dispatchEvent(new dom.window.Event('pointerup'));
 });

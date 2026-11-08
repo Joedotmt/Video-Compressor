@@ -10,12 +10,16 @@
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&amp;display=swap" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Pangolin&amp;display=swap"
+      crossorigin
+    />
     <link rel="stylesheet" href="/web/style.css" />
   </head>
   <body>
     <header class="app-header">
-      <h1>JVC</h1>
+      <h1></h1>
       <nav class="tabs" role="tablist" aria-label="Video tools">
         <button
           id="compression-tab"
@@ -33,7 +37,6 @@
           aria-controls="edit-panel"
           tabindex="-1"
           type="button"
-          disabled
         >
           Trim &amp; Crop
         </button>
@@ -53,7 +56,7 @@
           Choose Video…
         </button>
         <button id="cancel" type="button" hidden>Cancel</button>
-        <button id="compress" type="submit" form="settings" disabled hidden>
+        <button id="compress" type="submit" form="settings" disabled>
           Export
         </button>
       </div>
@@ -65,9 +68,10 @@
         accept="video/*,.mkv,.avi,.mov,.m4v,.mts,.m2ts,.ts,.webm"
         hidden
       />
-      <section id="empty-state">
-        <p>Open a video or drop one here.</p>
-        <button id="dropzone" type="button" disabled>Open Video…</button>
+      <section id="empty-state" aria-label="Choose a video" aria-busy="false">
+        <button id="dropzone" type="button" disabled>
+          <span id="dropzone-label">Drag a video here or click to choose</span>
+        </button>
       </section>
 
       <div id="editor" hidden>
@@ -254,6 +258,7 @@
                   >
                     Crop
                   </button>
+                  <button id="preview-scale-tool" type="button" aria-pressed="false" title="Scale / stretch (S)">Scale</button>
                   <button
                     id="preview-hand-tool"
                     type="button"
@@ -322,7 +327,7 @@
                     ><input
                       id="preview-zoom"
                       type="number"
-                      min="1"
+                      min="0.01"
                       max="6400"
                       step="any"
                       value="100"
@@ -455,6 +460,12 @@
                       </select></label
                     >
                     <button id="reset-crop" type="button">Reset</button>
+                  </div>
+                  <div id="scale-fields" class="crop-strip" hidden>
+                    <label title="Output width">W <input id="scale-width" aria-label="Output width" inputmode="decimal" value="0" /></label>
+                    <label title="Output height">H <input id="scale-height" aria-label="Output height" inputmode="decimal" value="0" /></label>
+                    <label><input id="scale-proportional" type="checkbox" /> Keep ratio</label>
+                    <button id="reset-scale" type="button">Reset</button>
                   </div>
                 </div>
               </div>
@@ -695,8 +706,9 @@
                       Drag a segment to move it · Middle-drag: Pan timeline ·
                       Drag scrollbar ends: Zoom · I: Add In point · O: Add Out
                       point · =/−: Timeline zoom · \: Fit timeline · B: Split ·
-                      Delete: Remove selected segment · Z: Fit video · H/V:
-                      Hand/Crop tool · Space: Play/Pause (hold and drag to pan)
+                      Delete: Remove selected segment · Z: Fit video · H/V/S:
+                      Hand/Crop/Scale tool · Shift-drag: Scale proportionally · Escape: Deselect rectangle · Enter on rectangle: Select
+                      · Space: Play/Pause (hold and drag to pan)
                       · ←/→: Seek 1 second · ,/.: Step by nominal frame
                       duration. Shortcuts are active in this tab outside text
                       fields. Times accept seconds or HH:MM:SS.mmm.

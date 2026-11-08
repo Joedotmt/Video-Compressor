@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { JSDOM } from 'jsdom';
 
-test('tabs, edit validation, automatic dimensions and export share the same job', async () => {
+test('tabs, edit validation, shared scale dimensions and export share the same job', async () => {
   const dom = new JSDOM(readFileSync('index.html', 'utf8'), { url: 'http://localhost/' });
   globalThis.document = dom.window.document; globalThis.window = dom.window; globalThis.Option = dom.window.Option;
   for (const method of ['pause', 'load']) dom.window.HTMLMediaElement.prototype[method] = () => {};
@@ -25,16 +25,42 @@ test('tabs, edit validation, automatic dimensions and export share the same job'
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
   const input = (id, value, event = 'input') => { $(id).value = value; $(id).dispatchEvent(new dom.window.Event(event, { bubbles: true })); };
   await tick();
+  assert.equal($('empty-state').hidden, false);
+  assert.equal($('compress').hidden, false);
+  assert.equal($('compress').disabled, true);
+  assert.match($('dropzone').textContent, /Drag a video here or click to choose/);
+  // Picking a tab before loading must not switch the empty screen's layout.
+  for (const tab of ['edit', 'compression', 'edit']) {
+    $(`${tab}-tab`).click();
+    assert.equal($(`${tab}-tab`).getAttribute('aria-selected'), 'true');
+    assert.equal(document.body.classList.contains('editing'), false);
+    assert.equal($('empty-state').hidden, false);
+  }
   Object.defineProperty($('file'), 'files', { value: [new File(['fixture'], 'source.mp4')], configurable: true });
-  $('file').dispatchEvent(new dom.window.Event('change')); await tick();
+  $('file').dispatchEvent(new dom.window.Event('change'));
+  assert.equal($('empty-state').hidden, false);
+  assert.equal($('empty-state').getAttribute('aria-busy'), 'true');
+  assert.equal($('dropzone-label').textContent, 'Reading video…');
+  assert.equal($('compress').hidden, false);
+  assert.equal(document.body.classList.contains('editing'), false);
+  await tick();
+  assert.equal($('empty-state').hidden, true);
   assert.equal($('editor').hidden, false); assert.equal($('edit-tab').disabled, false);
+  assert.equal(document.body.classList.contains('editing'), true);
   $('edit-tab').click(); assert.equal($('compression-panel').hidden, true);
   assert.equal($('edit-tab').getAttribute('aria-selected'), 'true');
   assert.ok($('diagnostics').closest('.timeline-options'));
   assert.equal($('diagnostics').closest('.bottom-bar'), null);
   input('crop-width', '640/2'); input('crop-x', '11'); assert.equal($('width').value, '320');
   $('compression-tab').click(); input('width', '160'); input('speed', '2');
-  $('edit-tab').click(); input('crop-width', '200'); assert.equal($('width').value, '160');
+  $('edit-tab').click(); input('crop-width', '200'); assert.equal($('width').value, '100');
+  assert.equal($('scale-width').value, '100');
+  $('preview-scale-tool').click(); input('scale-height', '480/2');
+  assert.equal($('height').value, '240');
+  assert.equal($('scale-height').value, '480/2');
+  $('compression-tab').click(); input('height', '480');
+  assert.equal($('scale-height').value, '480');
+  $('edit-tab').click();
   for (const [start, end] of [[1, 3], [5, 7]]) {
     input('playhead-time', String(start), 'change'); $('mark-in').click();
     input('playhead-time', String(end), 'change'); $('mark-out').click();
@@ -52,7 +78,7 @@ test('tabs, edit validation, automatic dimensions and export share the same job'
   assert.equal(submitted.audio, true); // Preview volume never changes exported audio.
   assert.deepEqual(submitted.segments, [{ start: 1, end: 3 }, { start: 5, end: 8 }]);
   assert.deepEqual(submitted.crop, { x: 11, y: 0, width: 200, height: 480 });
-  assert.equal(submitted.width, 160);
+  assert.equal(submitted.width, 100);
   finish(new Blob(['encoded'], { type: 'video/mp4' })); await tick();
   assert.equal($('result').hidden, false); assert.equal($('edit-controls').disabled, false);
   assert.equal($('download').download, 'source_compressed.mp4');
@@ -69,6 +95,15 @@ test('tabs, edit validation, automatic dimensions and export share the same job'
   assert.equal($('edit-tab').getAttribute('aria-selected'), 'true');
   assert.equal($('diagnostics').parentElement, $('header-options'));
   assert.match($('message').textContent, /Cannot read source/);
+  assert.equal($('empty-state').hidden, false);
+  assert.equal($('empty-state').getAttribute('aria-busy'), 'false');
+  assert.equal($('dropzone').disabled, false);
+  assert.equal($('dropzone-label').textContent, 'Drag a video here or click to choose');
+  assert.equal($('compress').hidden, false);
+  assert.equal($('compress').disabled, true);
+  assert.equal(document.body.classList.contains('editing'), false);
+  $('compression-tab').click(); $('edit-tab').click();
+  assert.equal(document.body.classList.contains('editing'), false);
   failProbe = false; await replace('retry.mp4');
   assert.equal($('edit-panel').hidden, false);
   $('compression-tab').click();

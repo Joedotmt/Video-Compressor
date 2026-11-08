@@ -1,13 +1,13 @@
 import { TimelineNavigation } from './timeline.js';
 import { PreviewView } from './preview.js';
 import { expression } from './compressor.js';
-import { clamp, timecode, parseTime, frameCount, frameIndex, frameTime, snapTime, segmentsFromPoints, normalizeEdits, fitRatio, dragCrop, moveSegment, zoomScrollPosition, timelineGeometry } from './edits.js';
+import { clamp, timecode, parseTime, frameCount, frameIndex, frameTime, snapTime, segmentsFromPoints, normalizeEdits, fitRatio, dragCrop, dragResize, resizedDimensions, moveSegment, zoomScrollPosition, timelineGeometry } from './edits.js';
 const $ = id => document.getElementById(id);
 const cropFields = ['x', 'y', 'width', 'height'];
 export class VideoEditor {
   constructor(onChange, onPreview) {
     this.onChange = onChange; this.source = null; this.url = null; this.busy = false;
-    this.points = []; this.ranges = []; this.nextPointId = 1; this.selected = null; this.activePoint = null; this.crop = null;
+    this.points = []; this.ranges = []; this.nextPointId = 1; this.selected = null; this.activePoint = null; this.crop = null; this.stretch = { x: 1, y: 1 };
     this.video = $('edit-video'); this.playhead = 0;
     this.timelineZoom = 1; this.previewZoom = 1; this.cropDragging = false;
     this.preview = new PreviewView(this);
@@ -18,6 +18,7 @@ export class VideoEditor {
   reset(file, source) {
     this.dispose(); this.source = source; this.points = []; this.ranges = []; this.nextPointId = 1; this.selected = null; this.activePoint = null; this.playhead = 0;
     this.crop = { x: 0, y: 0, width: source.width, height: source.height };
+    this.stretch = { x: 1, y: 1 }; $('scale-proportional').checked = false;
     $('crop-ratio').value = '0'; $('trim-mode').value = 'keep'; $('preview-kept').checked = false;
     $('seek').max = source.duration; $('seek').step = 1 / source.fps; this.timelineZoom = 1; this.previewZoom = 1;
     this.preview.reset(); this.timelineNeedsFit = true;
@@ -44,7 +45,7 @@ export class VideoEditor {
     this.url = URL.createObjectURL(blob); $('preview-unavailable').hidden = true;
     this.video.src = this.url; this.video.load();
   }
-  setBusy(busy) { if (busy) { this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishScrub?.(); this.stopPlaybackClock(); } this.busy = busy; $('edit-controls').disabled = busy || !this.source; if (busy) this.video.pause(); }
+  setBusy(busy) { if (busy) { this.finishCropDrag?.(); this.navigation?.finish?.(); this.finishTrimDrag?.(); this.finishScrub?.(); this.stopPlaybackClock(); } this.busy = busy; $('edit-controls').disabled = busy || !this.source; if (busy) this.video.pause(); }
   error(text = '') { $('edit-error').textContent = text; }
   getEdits() {
     if (this.points.length && !this.ranges.length) throw new Error('These points do not define a segment. Move or delete a point.');
@@ -339,9 +340,42 @@ export class VideoEditor {
     viewport.addEventListener('pointermove', move);
     for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) viewport.addEventListener(name, end);
   }
-  ratio() { return $('crop-ratio').value === 'original' ? this.source.width / this.source.height : Number($('crop-ratio').value); }
+  // Preserve stretch factors across crops; round only the encoder dimensions.
+  getOutputSize() { return resizedDimensions(this.crop, this.stretch); }
+  syncOutputSize(keepField = '') {
+    const size = this.getOutputSize();
+    for (const key of ['width', 'height']) for (const id of [key, `scale-${key}`]) {
+      if (id !== keepField) $(id).value = size[key];
+      $(id).removeAttribute('aria-invalid');
+    }
+  }
+  resizeAnchor(handle = 'se') {
+    const crop = this.crop, g = this.preview.geometry;
+    if (!g) return null;
+    const source = { x: handle.includes('w') ? crop.x + crop.width : handle.includes('e') ? crop.x : crop.x + crop.width / 2,
+      y: handle.includes('n') ? crop.y + crop.height : handle.includes('s') ? crop.y : crop.y + crop.height / 2 };
+    return { source, screen: { x: g.left + source.x * g.scaleX, y: g.top + source.y * g.scaleY }, scale: g.scale };
+  }
+  setOutputSize(width, height, { keepField = '', anchor = this.resizeAnchor() } = {}) {
+    if (![width, height].every(n => Number.isFinite(n) && n >= 2 && n <= 16384)) throw new Error('Output dimensions must be between 2 and 16384 pixels.');
+    const previous = this.stretch;
+    this.stretch = { x: Math.floor(width / 2) * 2 / this.crop.width, y: Math.floor(height / 2) * 2 / this.crop.height };
+    // Freeze Fit while resizing so the opposite handle stays at its screen position.
+    if (anchor && (previous.x !== this.stretch.x || previous.y !== this.stretch.y)) {
+      const view = this.preview.dimensions();
+      this.preview.scale = anchor.scale;
+      this.preview.center = { x: anchor.source.x - (anchor.screen.x - view.width / 2) / (anchor.scale * this.stretch.x),
+        y: anchor.source.y - (anchor.screen.y - view.height / 2) / (anchor.scale * this.stretch.y) };
+    }
+    this.syncOutputSize(keepField); this.renderPreview(); this.error('');
+  }
+  resetScale() {
+    this.setOutputSize(this.crop.width, this.crop.height); this.notify();
+  }
+  ratio() { return $('crop-ratio').value === 'original' ? this.source.width / this.source.height : Number($('crop-ratio').value) * this.stretch.y / this.stretch.x; }
   renderCrop(updateInputs = true) {
     if (!this.source) return;
+    this.syncOutputSize();
     const box = $('crop-box');
     cropFields.forEach(key => { const input = $(`crop-${key}`); if (updateInputs) { input.value = this.crop[key]; input.removeAttribute('aria-invalid'); } });
     box.style.left = `${this.crop.x / this.source.width * 100}%`; box.style.top = `${this.crop.y / this.source.height * 100}%`;
@@ -350,16 +384,27 @@ export class VideoEditor {
     else this.preview.positionInspector();
   }
   drag(event) {
-    if (this.busy || event.button !== 0) return;
+    if (this.busy || !this.preview.cropSelected || event.button !== 0) return;
+    if (this.preview.editTool === 'scale' && !event.target.closest('[data-handle]')) return;
     event.preventDefault(); this.video.pause();
     this.cropDragging = true; $('preview-viewport').classList.add('crop-dragging');
     const target = event.target.closest('[data-handle]') || $('crop-box'), handle = target.dataset.handle || 'move';
+    const resizing = this.preview.editTool === 'scale', output = this.getOutputSize(), anchor = this.resizeAnchor(handle);
     const original = { ...this.crop }, rect = $('video-stage').getBoundingClientRect(), x = event.clientX, y = event.clientY;
     target.setPointerCapture(event.pointerId);
-    const move = e => { this.crop = dragCrop(original, handle, (e.clientX - x) * this.source.width / rect.width, (e.clientY - y) * this.source.height / rect.height, this.source, this.ratio()); this.renderCrop(); this.notify(); };
-    const end = () => { target.removeEventListener('pointermove', move); target.removeEventListener('lostpointercapture', end); this.cropDragging = false; $('preview-viewport').classList.remove('crop-dragging'); this.renderPreview(); this.error(''); this.notify(); this.finishCropDrag = null; };
+    const move = e => {
+      if (resizing) {
+        if (!anchor) return;
+        const size = dragResize(output, handle, (e.clientX - x) / anchor.scale, (e.clientY - y) / anchor.scale, e.shiftKey || $('scale-proportional').checked);
+        this.setOutputSize(size.width, size.height, { anchor });
+      } else {
+        this.crop = dragCrop(original, handle, (e.clientX - x) * this.source.width / rect.width, (e.clientY - y) * this.source.height / rect.height, this.source, this.ratio()); this.renderCrop();
+      }
+      this.notify();
+    };
+    const end = () => { target.removeEventListener('pointermove', move); for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) target.removeEventListener(name, end); this.cropDragging = false; $('preview-viewport').classList.remove('crop-dragging'); this.renderPreview(); this.error(''); this.notify(); this.finishCropDrag = null; };
     this.finishCropDrag = end;
-    target.addEventListener('pointermove', move); target.addEventListener('lostpointercapture', end);
+    target.addEventListener('pointermove', move); for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) target.addEventListener(name, end);
   }
   scrollTimeline(value) {
     const viewport = $('timeline-scroll'), width = viewport.clientWidth || 640;
@@ -535,6 +580,18 @@ export class VideoEditor {
     };
     $('reset-trim').onclick = () => { this.points = []; this.ranges = []; this.nextPointId = 1; this.selected = null; this.activePoint = null; this.error(''); this.renderSegments(); this.notify(); };
     $('trim-mode').onchange = () => { this.renderSegments(); this.notify(); };
+    $('reset-scale').onclick = () => this.resetScale();
+    for (const key of ['width', 'height']) $(`scale-${key}`).oninput = () => {
+      const field = $(`scale-${key}`);
+      try {
+        const size = this.getOutputSize(), value = expression(field.value);
+        const other = key === 'width' ? 'height' : 'width';
+        if ($('scale-proportional').checked) size[other] *= value / size[key];
+        size[key] = value;
+        this.setOutputSize(size.width, size.height, { keepField: field.id });
+      } catch (error) { field.setAttribute('aria-invalid', 'true'); this.error(error.message); }
+      this.notify();
+    };
     $('reset-crop').onclick = () => { this.crop = { x: 0, y: 0, width: this.source.width, height: this.source.height }; $('crop-ratio').value = '0'; this.renderCrop(); this.error(''); this.notify(); };
     $('crop-ratio').onchange = () => { this.crop = fitRatio(this.source, this.ratio()); this.renderCrop(); this.error(''); this.notify(); };
     for (const key of cropFields) $(`crop-${key}`).oninput = () => {
@@ -549,8 +606,13 @@ export class VideoEditor {
     };
     $('crop-box').onpointerdown = event => this.drag(event);
     $('crop-box').onkeydown = event => {
-      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) || this.busy) return;
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) || this.busy || !this.preview.cropSelected) return;
       event.preventDefault(); event.stopPropagation(); const delta = event.shiftKey ? 10 : 1;
+      if (this.preview.editTool === 'scale') {
+        const handle = event.target.dataset.handle || 'se';
+        const size = dragResize(this.getOutputSize(), handle, event.key === 'ArrowLeft' ? -delta * 2 : event.key === 'ArrowRight' ? delta * 2 : 0, event.key === 'ArrowUp' ? -delta * 2 : event.key === 'ArrowDown' ? delta * 2 : 0, $('scale-proportional').checked);
+        this.setOutputSize(size.width, size.height, { anchor: this.resizeAnchor(handle) }); this.notify(); return;
+      }
       this.crop = dragCrop(this.crop, event.target.dataset.handle || 'move', event.key === 'ArrowLeft' ? -delta : event.key === 'ArrowRight' ? delta : 0, event.key === 'ArrowUp' ? -delta : event.key === 'ArrowDown' ? delta : 0, this.source, this.ratio());
       this.renderCrop(); this.notify();
     };
@@ -569,7 +631,7 @@ export class VideoEditor {
       if ($('edit-panel').hidden || this.busy || !this.source || event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input:not([type="range"]):not([type="checkbox"]), select, textarea, [contenteditable="true"]')) return;
       const key = event.key.toLowerCase();
       if (event.target.matches('input[type="range"]') && ['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(key)) return;
-      const actions = { i: () => this.markIn(), o: () => this.markOut(), '=': () => this.zoomTimeline(this.timelineZoom * 2), '+': () => this.zoomTimeline(this.timelineZoom * 2), '-': () => this.zoomTimeline(this.timelineZoom / 2), '\\': () => this.zoomTimeline(1, this.source.duration / 2), b: () => this.split(), z: () => this.preview.fit(), h: () => this.preview.setTool('hand'), v: () => this.preview.setTool('crop'), arrowleft: () => this.position(this.playhead - (event.shiftKey ? 5 : 1)), arrowright: () => this.position(this.playhead + (event.shiftKey ? 5 : 1)), ',': () => $('step-back').click(), '.': () => $('step-forward').click(), delete: () => this.deleteSelection() };
+      const actions = { i: () => this.markIn(), o: () => this.markOut(), '=': () => this.zoomTimeline(this.timelineZoom * 2), '+': () => this.zoomTimeline(this.timelineZoom * 2), '-': () => this.zoomTimeline(this.timelineZoom / 2), '\\': () => this.zoomTimeline(1, this.source.duration / 2), b: () => this.split(), z: () => this.preview.fit(), h: () => this.preview.setTool('hand'), v: () => this.preview.setTool('crop'), s: () => this.preview.setTool('scale'), arrowleft: () => this.position(this.playhead - (event.shiftKey ? 5 : 1)), arrowright: () => this.position(this.playhead + (event.shiftKey ? 5 : 1)), ',': () => $('step-back').click(), '.': () => $('step-forward').click(), delete: () => this.deleteSelection() };
       if (actions[key]) { event.preventDefault(); actions[key](); }
     });
     document.addEventListener('keyup', event => {

@@ -118,34 +118,44 @@ export function moveSegment(ranges, index, delta, duration) {
   const shift = clamp(delta, min, max);
   return { start: segment.start + shift, end: segment.end + shift };
 }
-export function previewGeometry(source, viewportWidth, viewportHeight, scale = null, center = null, controlsHeight = 0) {
+export const minimumPreviewScale = .0001;
+export function resizedDimensions(crop, stretch) {
+  return { width: Math.max(2, Math.floor((crop.width * stretch.x + 1e-7) / 2) * 2),
+    height: Math.max(2, Math.floor((crop.height * stretch.y + 1e-7) / 2) * 2) };
+}
+export function dragResize(size, handle, dx, dy, proportional = false) {
+  let width = size.width + (handle.includes('e') ? dx : handle.includes('w') ? -dx : 0);
+  let height = size.height + (handle.includes('s') ? dy : handle.includes('n') ? -dy : 0);
+  if (proportional) {
+    const horizontal = /[ew]/.test(handle), vertical = /[ns]/.test(handle);
+    const factor = !vertical || horizontal && Math.abs(width / size.width - 1) >= Math.abs(height / size.height - 1)
+      ? width / size.width : height / size.height;
+    const bounded = clamp(factor, Math.max(2 / size.width, 2 / size.height), Math.min(16384 / size.width, 16384 / size.height));
+    width = size.width * bounded; height = size.height * bounded;
+  }
+  return { width: Math.floor(clamp(width, 2, 16384) / 2) * 2, height: Math.floor(clamp(height, 2, 16384) / 2) * 2 };
+}
+export function previewGeometry(source, viewportWidth, viewportHeight, scale = null, center = null, controlsHeight = 0, stretch = { x: 1, y: 1 }) {
   const marginY = controlsHeight ? Math.max(20, controlsHeight + 24) : 20;
-  const fit = Math.min(Math.max(1, viewportWidth - 40) / source.width, Math.max(1, viewportHeight - 2 * marginY) / source.height);
-  scale = scale === null ? fit : clamp(scale, fit, Math.max(fit, 64));
+  const fit = Math.min(Math.max(1, viewportWidth - 40) / (source.width * stretch.x), Math.max(1, viewportHeight - 2 * marginY) / (source.height * stretch.y));
+  scale = scale === null ? fit : clamp(scale, minimumPreviewScale, Math.max(fit, 64));
   center ||= { x: source.width / 2, y: source.height / 2 };
-  // Keep the video centered on axes that fit. On enlarged axes, allow panning
-  // to either edge with a small margin, but never into empty space beyond it.
-  const limitX = Math.max(0, (source.width - Math.max(1, viewportWidth - 40) / scale) / 2);
-  const limitY = Math.max(0, (source.height - Math.max(1, viewportHeight - 40) / scale) / 2);
-  center = {
-    x: clamp(center.x, source.width / 2 - limitX, source.width / 2 + limitX),
-    y: clamp(center.y, source.height / 2 - limitY, source.height / 2 + limitY)
-  };
-  return { scale, fitScale: fit, center, width: source.width * scale, height: source.height * scale,
-    left: viewportWidth / 2 - center.x * scale, top: viewportHeight / 2 - center.y * scale };
+  const scaleX = scale * stretch.x, scaleY = scale * stretch.y;
+  return { scale, scaleX, scaleY, stretchX: stretch.x, stretchY: stretch.y, fitScale: fit, center, width: source.width * scaleX, height: source.height * scaleY,
+    left: viewportWidth / 2 - center.x * scaleX, top: viewportHeight / 2 - center.y * scaleY };
 }
 export function cropControlsPosition(geometry, crop, viewport, controls) {
-  const anchorX = geometry.left + crop.x * geometry.scale;
+  const anchorX = geometry.left + crop.x * (geometry.scaleX ?? geometry.scale);
   // Use one crop-relative anchor at every zoom level, including during a drag.
-  const anchorY = geometry.top + crop.y * geometry.scale;
+  const anchorY = geometry.top + crop.y * (geometry.scaleY ?? geometry.scale);
   return {
     left: clamp(anchorX, 8, Math.max(8, viewport.width - controls.width - 8)),
     top: clamp(anchorY - controls.height - 16, 8, Math.max(8, viewport.height - controls.height - 8))
   };
 }
 export function zoomPreviewAt(geometry, anchor, viewport, nextScale) {
-  const x = (anchor.x - geometry.left) / geometry.scale;
-  const y = (anchor.y - geometry.top) / geometry.scale;
-  return { x: x - (anchor.x - viewport.width / 2) / nextScale,
-    y: y - (anchor.y - viewport.height / 2) / nextScale };
+  const x = (anchor.x - geometry.left) / (geometry.scaleX ?? geometry.scale);
+  const y = (anchor.y - geometry.top) / (geometry.scaleY ?? geometry.scale);
+  return { x: x - (anchor.x - viewport.width / 2) / (nextScale * (geometry.stretchX ?? 1)),
+    y: y - (anchor.y - viewport.height / 2) / (nextScale * (geometry.stretchY ?? 1)) };
 }

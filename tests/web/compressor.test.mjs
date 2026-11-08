@@ -24,7 +24,7 @@ test('speed filters stay in supported range and output fps follows retiming', ()
   assert.equal(tempo(10000), 'atempo=100,atempo=100');
   const args = command(plan({ ...values, speed: '2' }, source), '/input/a video.mp4');
   assert.ok(args.includes('/input/a video.mp4'));
-  assert.equal(args[args.indexOf('-vf') + 1], 'scale=960:540,setpts=(PTS-STARTPTS)/2,fps=30');
+  assert.equal(args[args.indexOf('-vf') + 1], 'scale=960:540,setsar=1,setpts=(PTS-STARTPTS)/2,fps=30');
 });
 test('codec-specific options and tuning', () => {
   const av1 = command(plan({ ...values, codec: 'libaom-av1', preset: '6' }, source), 'input');
@@ -58,5 +58,5 @@ test('AV1 bridge applies edits once and keeps final encoder settings and bitrate
   assert.equal(prepared.videoBps, job.videoBps); assert.equal(prepared.audioBps, job.audioBps);
   assert.equal(prepared.duration, 2); assert.equal(prepared.codec, job.codec);
   assert.ok(!final.includes('libaom-av1')); assert.ok(!final.includes('-filter_complex'));
-  assert.equal(final[final.indexOf('-vf') + 1], 'scale=960:540,setpts=(PTS-STARTPTS)/1,fps=30');
+  assert.equal(final[final.indexOf('-vf') + 1], 'scale=960:540,setsar=1,setpts=(PTS-STARTPTS)/1,fps=30');
 });
