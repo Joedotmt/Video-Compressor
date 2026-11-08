@@ -338,10 +338,10 @@ input[aria-invalid="true"] { border-color: var(--error); outline: 1px solid var(
 .timeline-options { border-top: 1px solid var(--separator); padding-top: 4px; }
 
 /* One application bar and a workspace that uses the available height. */
-#controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+#controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
 #controls > section, #controls > .advanced { margin: 0; }
-#controls > .advanced { grid-column: 2; grid-row: 2 / span 2; }
-#controls > .preference-list { grid-column: 1; }
+#controls .section-reset { display: block; width: 100%; min-height: 32px; margin: 0; border: 0; border-top: 1px solid var(--separator); border-radius: 0 0 6px 6px; background: transparent; font-size: 12px; }
+#controls .section-reset:hover:not(:disabled) { background: var(--hover); }
 .timeline-lane { display: grid; grid-template-columns: 48px minmax(0, 1fr); }
 .timeline-gutter { background: var(--gutter-background); border-right: 1px solid var(--border); position: relative; user-select: none; }
 .timeline-gutter span { display: block; padding-top: 48px; text-align: center; color: var(--muted); font-size: 10px; }
@@ -382,9 +382,6 @@ input[aria-invalid="true"] { border-color: var(--error); outline: 1px solid var(
   .timeline-navigator { height: 30px; }
   #timeline-thumb { top: 4px; bottom: 4px; }
   .timeline-footer .shortcut-help { margin-left: auto; }
-  #controls { grid-template-columns: minmax(0, 1fr); }
-  #controls > .advanced { grid-column: auto; grid-row: auto; }
-  #controls > .preference-list { grid-column: auto; }
 }
 @media (max-width: 480px) {
   .app-header .tabs { flex: 1; }

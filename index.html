@@ -82,23 +82,13 @@
         >
           <form id="settings" novalidate>
             <fieldset id="controls" disabled>
-              <section aria-labelledby="output-heading">
-                <div class="section-heading">
-                  <h2 id="output-heading">Output</h2>
-                  <button
-                    id="reset-target"
-                    type="button"
-                    title="Use Source Size"
-                  >
-                    Reset
-                  </button>
-                </div>
-                <p class="description group-description">
-                  Choose the approximate size of the compressed file.
-                </p>
+              <section aria-label="Output settings">
                 <div class="preference-list">
                   <div class="row">
-                    <label for="target">Target Size</label>
+                    <div>
+                      <label for="target">Target Size</label>
+                      <p class="description">Choose the approximate size of the compressed file.</p>
+                    </div>
                     <div class="value">
                       <input id="target" value="25" inputmode="decimal" /><span
                         >MB</span
@@ -109,20 +99,11 @@
                     <span>Estimated Video Bitrate</span
                     ><output id="bitrate">—</output>
                   </div>
+                  <button id="reset-target" class="section-reset" type="button" title="Use Source Size" aria-label="Reset output settings">Reset</button>
                 </div>
               </section>
 
-              <section aria-labelledby="video-heading">
-                <div class="section-heading">
-                  <h2 id="video-heading">Video</h2>
-                  <button
-                    id="reset-video"
-                    type="button"
-                    title="Use Source Video Settings"
-                  >
-                    Reset
-                  </button>
-                </div>
+              <section aria-label="Video settings">
                 <div class="preference-list">
                   <div class="row">
                     <label for="width">Width</label>
@@ -154,20 +135,11 @@
                     <span>Output Video</span
                     ><output id="output-summary">—</output>
                   </div>
+                  <button id="reset-video" class="section-reset" type="button" title="Use Source Video Settings" aria-label="Reset video settings">Reset</button>
                 </div>
               </section>
 
-              <section aria-labelledby="audio-heading">
-                <div class="section-heading">
-                  <h2 id="audio-heading">Audio</h2>
-                  <button
-                    id="reset-audio"
-                    type="button"
-                    title="Use Source Audio Bitrate"
-                  >
-                    Reset
-                  </button>
-                </div>
+              <section aria-label="Audio settings">
                 <div class="preference-list">
                   <div class="row">
                     <div>
@@ -193,17 +165,12 @@
                       /><span>kbps</span>
                     </div>
                   </div>
+                  <button id="reset-audio" class="section-reset" type="button" title="Use Source Audio Bitrate" aria-label="Reset audio settings">Reset</button>
                 </div>
               </section>
 
               <details class="advanced">
-                <summary>
-                  <span
-                    >Advanced Options<span class="description"
-                      >Codec, encoding speed, tuning, and playback speed</span
-                    ></span
-                  >
-                </summary>
+                <summary>Advanced Options</summary>
                 <div class="advanced-content">
                   <div class="row">
                     <label for="codec">Codec</label
@@ -230,6 +197,7 @@
                     </div>
                   </div>
                   <p id="codec-hint" class="description"></p>
+                  <button id="reset-advanced" class="section-reset" type="button" title="Use Default Advanced Settings" aria-label="Reset advanced settings">Reset</button>
                 </div>
               </details>
             </fieldset>

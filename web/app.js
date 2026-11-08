@@ -144,6 +144,10 @@ $('settings').addEventListener('input', event => {
 $('reset-target').addEventListener('click', () => { $('target').value = Math.max(.01, source.sizeMB).toFixed(2); validate(); });
 $('reset-video').addEventListener('click', () => { resetVideo(); validate(); });
 $('reset-audio').addEventListener('click', () => { resetAudio(); validate(); });
+$('reset-advanced').addEventListener('click', () => {
+  $('codec').value = 'libx264'; encoderOptions(); $('speed').value = '1';
+  clearOutput(); validate();
+});
 $('cancel').addEventListener('click', () => { runner?.cancel(); $('cancel').disabled = true; message('Cancelled. No partial output was saved.'); });
 $('settings').addEventListener('submit', async event => {
   event.preventDefault(); validate(); if (!job || busy) return;
