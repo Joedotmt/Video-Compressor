@@ -135,11 +135,11 @@ export function dragResize(size, handle, dx, dy, proportional = false) {
   }
   return { width: Math.floor(clamp(width, 2, 16384) / 2) * 2, height: Math.floor(clamp(height, 2, 16384) / 2) * 2 };
 }
-export function previewGeometry(source, viewportWidth, viewportHeight, scale = null, center = null, controlsHeight = 0, stretch = { x: 1, y: 1 }) {
+export function previewGeometry(source, viewportWidth, viewportHeight, scale = null, center = null, controlsHeight = 0, stretch = { x: 1, y: 1 }, fitBounds = { x: 0, y: 0, ...source }) {
   const marginY = controlsHeight ? Math.max(20, controlsHeight + 24) : 20;
-  const fit = Math.min(Math.max(1, viewportWidth - 40) / (source.width * stretch.x), Math.max(1, viewportHeight - 2 * marginY) / (source.height * stretch.y));
+  const fit = Math.min(Math.max(1, viewportWidth - 40) / (fitBounds.width * stretch.x), Math.max(1, viewportHeight - 2 * marginY) / (fitBounds.height * stretch.y));
   scale = scale === null ? fit : clamp(scale, minimumPreviewScale, Math.max(fit, 64));
-  center ||= { x: source.width / 2, y: source.height / 2 };
+  center ||= { x: fitBounds.x + fitBounds.width / 2, y: fitBounds.y + fitBounds.height / 2 };
   const scaleX = scale * stretch.x, scaleY = scale * stretch.y;
   return { scale, scaleX, scaleY, stretchX: stretch.x, stretchY: stretch.y, fitScale: fit, center, width: source.width * scaleX, height: source.height * scaleY,
     left: viewportWidth / 2 - center.x * scaleX, top: viewportHeight / 2 - center.y * scaleY };

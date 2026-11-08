@@ -681,3 +681,41 @@ test('crop aspect presets describe the stretched output and source crop drags ac
   assert.equal(editor.crop.x, 60); assert.equal(editor.crop.y, 40);
   box.dispatchEvent(new dom.window.Event('pointerup'));
 });
+
+test('Fit and Z frame the stretched crop in Hand and Scale, and the source in Crop', () => {
+  reset();
+  const preview = editor.preview, view = $('preview-viewport');
+  Object.defineProperty(view, 'clientWidth', { value: 640, configurable: true });
+  Object.defineProperty(view, 'clientHeight', { value: 480, configurable: true });
+  editor.crop = { x: 180, y: 50, width: 200, height: 120 }; editor.renderCrop();
+  editor.setOutputSize(400, 60);
+  const before = editor.getEdits();
+  const checkCropFit = () => {
+    const g = preview.geometry, crop = editor.crop;
+    assert.ok(Math.abs(g.left + (crop.x + crop.width / 2) * g.scaleX - view.clientWidth / 2) < 1e-7);
+    assert.ok(Math.abs(g.top + (crop.y + crop.height / 2) * g.scaleY - view.clientHeight / 2) < 1e-7);
+    assert.ok(crop.width * g.scaleX <= view.clientWidth - 40 + 1e-7);
+    assert.ok(crop.height * g.scaleY <= view.clientHeight - 128 + 1e-7);
+    assert.equal(g.scale, Math.min((view.clientWidth - 40) / 400, (view.clientHeight - 128) / 60));
+  };
+  for (const tool of ['hand', 'scale']) {
+    preview.setTool(tool); preview.zoom(4); preview.center = { x: -100, y: -100 }; preview.render();
+    if (tool === 'hand') $('preview-fit').click(); else key('z');
+    checkCropFit();
+    const fitted = { ...preview.geometry };
+    preview.setTool('crop'); assert.deepEqual(preview.geometry, fitted);
+    key('z');
+    assert.deepEqual(preview.geometry.center, { x: 320, y: 240 });
+    assert.ok(preview.geometry.scale < fitted.scale);
+  }
+  preview.setTool('hand'); preview.fit();
+  Object.defineProperty(view, 'clientWidth', { value: 390, configurable: true });
+  preview.render(); checkCropFit();
+  const g = preview.geometry; view.setPointerCapture = () => {};
+  const pointer = x => ({ target: view, button: 0, pointerId: 1, clientX: x, clientY: 100, preventDefault() {}, stopPropagation() {} });
+  preview.begin(pointer(100)); preview.move(pointer(120)); preview.end(pointer(120));
+  assert.ok(Math.abs(preview.geometry.left - g.left - 20) < 1e-7);
+  assert.equal(preview.geometry.top, g.top);
+  assert.deepEqual(editor.getEdits(), before);
+  assert.deepEqual(editor.getOutputSize(), { width: 400, height: 60 });
+});

@@ -12,7 +12,7 @@ export class PreviewView {
   }
   reset() {
     this.scale = null; this.center = null; this.geometry = null; this.gesture = null;
-    this.controlsHeight = 40; this.editTool = 'crop';
+    this.controlsHeight = 40; this.editTool = 'crop'; this.fitCrop = false;
     this.points.clear(); this.viewport.classList.remove('panning'); this.setTool('crop');
   }
   setTool(tool) {
@@ -50,7 +50,7 @@ export class PreviewView {
     const source = this.editor.source, view = this.dimensions();
     if (!source || !view.width || !view.height) return;
     this.controlsHeight = Math.max(40, $('inspector').offsetHeight || this.controlsHeight);
-    this.geometry = previewGeometry(source, view.width, view.height, this.scale, this.center, this.controlsHeight, this.editor.stretch);
+    this.geometry = previewGeometry(source, view.width, view.height, this.scale, this.center, this.controlsHeight, this.editor.stretch, this.fitCrop ? this.editor.crop : undefined);
     if (this.scale !== null) {
       this.scale = this.geometry.scale; this.center = this.geometry.center;
     }
@@ -67,6 +67,8 @@ export class PreviewView {
   }
   fit() {
     if (this.editor.busy || this.editor.cropDragging) return;
+    // Remember the requested framing so switching tools alone does not move it.
+    this.fitCrop = this.tool !== 'crop';
     this.scale = null; this.center = null; this.render();
   }
   zoom(scale, anchor = null) {
@@ -99,9 +101,8 @@ export class PreviewView {
     }
     if (event.button === 1 || this.tool === 'hand' || this.editor.spaceHeld) {
       this.editor.spaceUsed = true;
-      const source = this.editor.source;
       this.gesture = { kind: 'pan', id: event.pointerId, point, scale: this.geometry.scale, scaleX: this.geometry.scaleX, scaleY: this.geometry.scaleY,
-        center: this.center ? { ...this.center } : { x: source.width / 2, y: source.height / 2 } };
+        center: { ...this.geometry.center } };
       this.viewport.setPointerCapture(event.pointerId);
       this.viewport.classList.add('panning');
       event.preventDefault(); event.stopPropagation();
