@@ -32,11 +32,19 @@ support both a GitHub Pages project subdirectory and a custom domain.
 
 1. Push this repository to GitHub.
 2. In **Settings → Pages → Build and deployment**, select **GitHub Actions**.
-3. Run **Browser app · GitHub Pages** from the Actions tab, or push to `main`.
+3. Push to `main`; every push automatically builds and deploys the browser app.
+   You can also run **Browser app · GitHub Pages** manually from the Actions tab
+   with `main` selected.
+
+For this repository, the default site URL is
+https://joedotmt.github.io/Qt-Video-Compressor/.
 
 The included workflow tests the calculations, builds the app, verifies actual
 WebAssembly encodes for all three codecs, and deploys `dist/`. Pull requests build
-and test without deploying. A small same-origin service worker adds isolation headers locally for threaded
+and test without deploying. No personal access token or extra secret is needed;
+the workflow uses GitHub's built-in token. Deployment starts only after all checks
+pass, so a failed build leaves the existing site in place.
+A small same-origin service worker adds isolation headers locally for threaded
 HEVC encoding. The page reloads once on first use, before file selection is enabled.
 GitHub Pages itself needs no custom header configuration. H.264 and AV1 use
 single-threaded engines.

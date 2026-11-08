@@ -2,46 +2,57 @@ name: Browser app · GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ['web/**', 'index.html', 'vite.config.js', 'package*.json', 'scripts/**', 'vendor/**', 'tests/web/**', '.github/workflows/pages.yml']
   pull_request:
-    paths: ['web/**', 'index.html', 'vite.config.js', 'package*.json', 'scripts/**', 'vendor/**', 'tests/web/**', '.github/workflows/pages.yml']
+    paths: ['web/**', 'public/**', 'data/**', 'index.html', 'vite.config.js', 'package*.json', 'scripts/**', 'vendor/**', 'tests/web/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: true
+  # Replace obsolete PR checks, but let an active production deployment finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - name: Install dependencies
+        run: npm ci
+      - name: Run browser app tests
+        run: npm test
+      - name: Build static site
+        run: npm run build
       - name: Verify real browser engines
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           timeout 180 node scripts/smoke-engines.mjs
           timeout 30 node scripts/smoke-worker.mjs
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload Pages site
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
         with:
           path: dist
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/deploy-pages@v4
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
         id: deployment
