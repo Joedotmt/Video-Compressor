@@ -1,5 +1,5 @@
 import { normalizeEdits } from './edits.js';
-// Toolkit-independent planning; the same bitrate model as compressor.py.
+// Browser-independent validation, bitrate planning, and FFmpeg commands.
 export const presets = [['Very fast', 'ultrafast'], ['Fast', 'fast'], ['Balanced', 'medium'], ['Slow', 'slow']];
 export const av1Presets = [['Highest quality', '0'], ['Very high quality', '1'], ['High quality', '2'], ['Quality', '3'], ['Balanced', '4'], ['Fast', '5'], ['Fastest', '6']];
 export const tunes = { libx264: ['', 'film', 'animation', 'grain', 'stillimage'], libx265: ['', 'animation', 'grain'], 'libaom-av1': [''] };
