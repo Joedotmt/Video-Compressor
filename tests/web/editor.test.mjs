@@ -619,6 +619,11 @@ test('all scale handles track screen deltas and keep the opposite edge or corner
     assert.equal(size.width, 640 + (handle.includes('e') ? 20 : handle.includes('w') ? -20 : 0));
     assert.equal(size.height, 120 + (handle.includes('s') ? 10 : handle.includes('n') ? -10 : 0));
     const g = editor.preview.geometry;
+    assert.equal(editor.cropDragging, true);
+    assert.ok(Math.abs(g.scaleX * editor.crop.width - size.width * anchor.scale) < 1e-7);
+    assert.ok(Math.abs(g.scaleY * editor.crop.height - size.height * anchor.scale) < 1e-7);
+    assert.equal(parseFloat($('video-stage').style.width), g.width);
+    assert.equal(parseFloat($('video-stage').style.height), g.height);
     assert.ok(Math.abs(g.left + anchor.source.x * g.scaleX - anchor.screen.x) < 1e-7);
     assert.ok(Math.abs(g.top + anchor.source.y * g.scaleY - anchor.screen.y) < 1e-7);
     assert.deepEqual(editor.crop, { x: 40, y: 20, width: 320, height: 240 });

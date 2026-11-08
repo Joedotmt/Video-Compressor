@@ -495,7 +495,10 @@ export class VideoEditor {
       ruler.append(tick);
     }
   }
-  renderPreview() { if (!this.cropDragging) this.preview.render(); }
+  renderPreview() {
+    // Crop drags keep the source camera fixed; scale drags resize the image live.
+    if (!this.cropDragging || this.preview.editTool === 'scale') this.preview.render();
+  }
   bind(onPreview) {
     $('timeline-scroll').onscroll = () => { this.renderRuler(); this.navigation.render(); };
     $('timeline-scroll').addEventListener('wheel', event => {
