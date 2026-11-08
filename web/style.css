@@ -213,6 +213,8 @@ input[aria-invalid="true"] { border-color: var(--error); outline: 1px solid var(
 #preview-volume-value { color: var(--muted); font-variant-numeric: tabular-nums; }
 #preview-mute { width: 100%; font-size: 12px; }
 #preview-viewport { position: relative; height: clamp(300px, 57dvh, 1000px); overflow: hidden; touch-action: none; user-select: none; background: repeating-conic-gradient(#252525 0% 25%, #2c2c2c 0% 50%) 0 0 / 24px 24px; }
+/* Match the crop mask's 40% black dimming without darkening the video or controls. */
+#preview-viewport:is(.scale-tool, .hand-tool) { background-image: linear-gradient(#0006, #0006), repeating-conic-gradient(#252525 0% 25%, #2c2c2c 0% 50%); }
 #preview-canvas { position: absolute; inset: 0; }
 #video-stage { position: absolute; outline: 1px solid #b8b8b8; box-shadow: 0 0 0 2px #080808; }
 #edit-video { object-fit: fill; width: 100%; height: 100%; display: block; pointer-events: none; }
